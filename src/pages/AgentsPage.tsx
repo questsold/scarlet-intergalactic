@@ -4,6 +4,8 @@ import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../services/firebase';
 
 interface FubAgent {
     id: number;
@@ -44,6 +46,7 @@ const getTitleWeight = (title?: string) => {
 };
 
 const AgentsPage: React.FC = () => {
+    const [authUser] = useAuthState(auth);
     const [loading, setLoading] = useState(true);
     const [fubAgents, setFubAgents] = useState<FubAgent[]>([]);
     const [accessMap, setAccessMap] = useState<Record<string, UserAccess>>({});
@@ -157,6 +160,43 @@ const AgentsPage: React.FC = () => {
         }
     };
 
+    const toggleRole = async (agentName: string, email: string) => {
+        if (!email) {
+            alert("This agent does not have a valid email address.");
+            return;
+        }
+
+        const emailKey = email.toLowerCase();
+        const currentAccess = accessMap[emailKey];
+        const newRole = currentAccess?.role === 'admin' ? 'user' : 'admin';
+        const currentHasAccess = currentAccess?.hasAccess || false;
+
+        setSaving(emailKey);
+        try {
+            const docRef = doc(db, 'allowed_users', emailKey);
+            await setDoc(docRef, {
+                hasAccess: currentHasAccess,
+                role: newRole,
+                name: agentName,
+                email: emailKey
+            }, { merge: true });
+
+            setAccessMap(prev => ({
+                ...prev,
+                [emailKey]: {
+                    email: emailKey,
+                    hasAccess: currentHasAccess,
+                    role: newRole
+                }
+            }));
+        } catch (err) {
+            console.error("Error saving access toggle:", err);
+            alert("Failed to save changes to the database.");
+        } finally {
+            setSaving(null);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -256,20 +296,36 @@ const AgentsPage: React.FC = () => {
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {agent.email ? (
-                                                                <button
-                                                                    onClick={() => toggleAccess(agent.name, agent.email!)}
-                                                                    disabled={isSaving}
-                                                                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
-                                                                        ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
-                                                                        : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
-                                                                        } disabled:opacity-50`}
-                                                                >
-                                                                    {isSaving ? 'Saving...' : hasAccess ? (
-                                                                        <><ShieldCheck size={16} /> Revoke Access</>
-                                                                    ) : (
-                                                                        <><ShieldAlert size={16} /> Grant Access</>
+                                                                <div className="flex flex-col gap-2 items-end">
+                                                                    <button
+                                                                        onClick={() => toggleAccess(agent.name, agent.email!)}
+                                                                        disabled={isSaving}
+                                                                        className={`inline-flex w-36 justify-center items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
+                                                                            ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
+                                                                            : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
+                                                                            } disabled:opacity-50`}
+                                                                    >
+                                                                        {isSaving ? 'Saving...' : hasAccess ? (
+                                                                            <><ShieldCheck size={16} /> Revoke Access</>
+                                                                        ) : (
+                                                                            <><ShieldAlert size={16} /> Grant Access</>
+                                                                        )}
+                                                                    </button>
+
+                                                                    {authUser?.email === 'ali@questsold.com' && (
+                                                                        <button
+                                                                            onClick={() => toggleRole(agent.name, agent.email!)}
+                                                                            disabled={isSaving || !hasAccess}
+                                                                            className={`inline-flex w-36 justify-center items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${dbAccess?.role === 'admin'
+                                                                                ? 'bg-purple-500/20 text-purple-300 hover:bg-orange-500/20 hover:text-orange-300 border border-purple-500/30 hover:border-orange-500/30'
+                                                                                : 'bg-white/5 text-slate-400 hover:bg-purple-500 hover:text-white border border-white/10'
+                                                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                                            title={!hasAccess ? "Must grant access first" : "Toggle admin role"}
+                                                                        >
+                                                                            {dbAccess?.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                                                                        </button>
                                                                     )}
-                                                                </button>
+                                                                </div>
                                                             ) : (
                                                                 <span className="text-xs text-red-400/80 italic">Requires valid email</span>
                                                             )}
