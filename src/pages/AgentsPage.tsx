@@ -176,133 +176,124 @@ const AgentsPage: React.FC = () => {
                     <p className="text-slate-400 mt-2">Manage all agents, their dashboard access, and sync BackOffice data.</p>
                 </div>
 
-                <div className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl overflow-hidden">
-                    <div className="p-6 border-b border-white/5 bg-slate-800/20">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-                                    User Management <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">{fubAgents.length} Agents</span>
-                                </h2>
-                                <p className="text-sm text-slate-400 mt-1">
-                                    Internal Team synchronized from Follow Up Boss and BoldTrail BackOffice.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                {(() => {
+                    const adminAgents = fubAgents.filter(a => {
+                        const emailKey = a.email?.toLowerCase();
+                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                        return getTitleWeight(title) <= 3;
+                    }).sort((a, b) => {
+                        const titleA = a.email ? btProfiles[a.email.toLowerCase()]?.title : undefined;
+                        const titleB = b.email ? btProfiles[b.email.toLowerCase()]?.title : undefined;
+                        const wA = getTitleWeight(titleA);
+                        const wB = getTitleWeight(titleB);
+                        if (wA !== wB) return wA - wB;
+                        return a.name.localeCompare(b.name);
+                    });
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
-                                    <th className="px-6 py-4">Agent Name</th>
-                                    <th className="px-6 py-4">Title</th>
-                                    <th className="px-6 py-4">Email & Phone</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
-                                    <th className="px-6 py-4 text-right">Dashboard Access</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(() => {
-                                    const adminAgents = fubAgents.filter(a => {
-                                        const emailKey = a.email?.toLowerCase();
-                                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
-                                        return getTitleWeight(title) <= 3;
-                                    }).sort((a, b) => {
-                                        const titleA = a.email ? btProfiles[a.email.toLowerCase()]?.title : undefined;
-                                        const titleB = b.email ? btProfiles[b.email.toLowerCase()]?.title : undefined;
-                                        const wA = getTitleWeight(titleA);
-                                        const wB = getTitleWeight(titleB);
-                                        if (wA !== wB) return wA - wB;
-                                        return a.name.localeCompare(b.name);
-                                    });
+                    const regularAgents = fubAgents.filter(a => {
+                        const emailKey = a.email?.toLowerCase();
+                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                        return getTitleWeight(title) > 3;
+                    }).sort((a, b) => a.name.localeCompare(b.name));
 
-                                    const regularAgents = fubAgents.filter(a => {
-                                        const emailKey = a.email?.toLowerCase();
-                                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
-                                        return getTitleWeight(title) > 3;
-                                    }).sort((a, b) => a.name.localeCompare(b.name));
+                    const renderTableSection = (title: string, agents: FubAgent[], description: string) => {
+                        if (agents.length === 0) return null;
 
-                                    const renderAgentRow = (agent: FubAgent) => {
-                                        const emailKey = agent.email?.toLowerCase();
-                                        const dbAccess = emailKey ? accessMap[emailKey] : null;
-                                        const hasAccess = dbAccess?.hasAccess || false;
-                                        const isSaving = saving === emailKey;
-                                        const profile = emailKey ? btProfiles[emailKey] : null;
+                        return (
+                            <div className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl overflow-hidden mb-8">
+                                <div className="p-6 border-b border-white/5 bg-slate-800/20">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                                                {title} <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">{agents.length} {title.includes('Leadership') ? 'Users' : 'Agents'}</span>
+                                            </h2>
+                                            <p className="text-sm text-slate-400 mt-1">
+                                                {description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        return (
-                                            <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-200">
-                                                    {agent.name}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm">
-                                                    {profile?.title || <span className="text-slate-600 italic">Agent</span>}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
-                                                        {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                    {formatDate(profile?.start_date)}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                    {formatDate(profile?.anniversary_date)}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {agent.email ? (
-                                                        <button
-                                                            onClick={() => toggleAccess(agent.name, agent.email!)}
-                                                            disabled={isSaving}
-                                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
-                                                                ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
-                                                                : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
-                                                                } disabled:opacity-50`}
-                                                        >
-                                                            {isSaving ? 'Saving...' : hasAccess ? (
-                                                                <><ShieldCheck size={16} /> Revoke Access</>
-                                                            ) : (
-                                                                <><ShieldAlert size={16} /> Grant Access</>
-                                                            )}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-xs text-red-400/80 italic">Requires valid email</span>
-                                                    )}
-                                                </td>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
+                                                <th className="px-6 py-4">Agent Name</th>
+                                                <th className="px-6 py-4">Title</th>
+                                                <th className="px-6 py-4">Email & Phone</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
+                                                <th className="px-6 py-4 text-right">Dashboard Access</th>
                                             </tr>
-                                        );
-                                    };
+                                        </thead>
+                                        <tbody>
+                                            {agents.map(agent => {
+                                                const emailKey = agent.email?.toLowerCase();
+                                                const dbAccess = emailKey ? accessMap[emailKey] : null;
+                                                const hasAccess = dbAccess?.hasAccess || false;
+                                                const isSaving = saving === emailKey;
+                                                const profile = emailKey ? btProfiles[emailKey] : null;
 
-                                    return (
-                                        <>
-                                            {adminAgents.length > 0 && (
-                                                <tr className="bg-slate-800/50">
-                                                    <td colSpan={6} className="px-6 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                                                        Leadership & Support
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            {adminAgents.map(renderAgentRow)}
+                                                return (
+                                                    <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                        <td className="px-6 py-4 font-medium text-slate-200">
+                                                            {agent.name}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm">
+                                                            {profile?.title || <span className="text-slate-600 italic">Agent</span>}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
+                                                                {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                            {formatDate(profile?.start_date)}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                            {formatDate(profile?.anniversary_date)}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {agent.email ? (
+                                                                <button
+                                                                    onClick={() => toggleAccess(agent.name, agent.email!)}
+                                                                    disabled={isSaving}
+                                                                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
+                                                                        ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
+                                                                        : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
+                                                                        } disabled:opacity-50`}
+                                                                >
+                                                                    {isSaving ? 'Saving...' : hasAccess ? (
+                                                                        <><ShieldCheck size={16} /> Revoke Access</>
+                                                                    ) : (
+                                                                        <><ShieldAlert size={16} /> Grant Access</>
+                                                                    )}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-xs text-red-400/80 italic">Requires valid email</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    };
 
-                                            {regularAgents.length > 0 && (
-                                                <tr className="bg-slate-800/50 border-t border-white/5">
-                                                    <td colSpan={6} className="px-6 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                                                        Advisors
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            {regularAgents.map(renderAgentRow)}
-                                        </>
-                                    );
-                                })()}
-                            </tbody>
-                        </table>
-                        {fubAgents.length === 0 && (
-                            <div className="p-8 text-center text-slate-500">No agents found from FUB API matching @questsold.com.</div>
-                        )}
-                    </div>
-                </div>
+                    return (
+                        <>
+                            {renderTableSection("Leadership & Support", adminAgents, "Brokers, Transaction Coordinators, and Agent Success Managers.")}
+                            {renderTableSection("Advisors", regularAgents, "Real Estate Advisors synchronized from Follow Up Boss and BoldTrail BackOffice.")}
+                            {fubAgents.length === 0 && (
+                                <div className="p-8 text-center text-slate-500">No agents found from FUB API matching @questsold.com.</div>
+                            )}
+                        </>
+                    );
+                })()}
             </div>
         </DashboardLayout>
     );
