@@ -71,6 +71,16 @@ const DealCard: React.FC<{ deal: UnifiedDeal }> = ({ deal }) => {
                     <div className="flex items-center gap-2 min-w-0">
                         {renderAvatar()}
                         <span className="text-slate-200 font-medium text-sm truncate">{deal.address || 'Unnamed Deal'}</span>
+                        <a
+                            href={`https://my.brokermint.com/#/transactions/${deal.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 outline-none focus:ring-2 focus:ring-blue-500/50"
+                            title="View in BackOffice"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img src="/brokermint-icon.png" alt="BackOffice" className="w-4 h-4 rounded-[3px] object-cover" />
+                        </a>
                     </div>
                     <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${ringColor} capitalize`}>
                         {deal.status === 'pending' ? 'under contract' : deal.status}
