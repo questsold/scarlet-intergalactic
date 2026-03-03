@@ -197,9 +197,8 @@ const AgentsPage: React.FC = () => {
                                     <th className="px-6 py-4">Agent Name</th>
                                     <th className="px-6 py-4">Title</th>
                                     <th className="px-6 py-4">Email & Phone</th>
-                                    <th className="px-6 py-4">Start Date</th>
-                                    <th className="px-6 py-4">Rollover Date</th>
-                                    <th className="px-6 py-4 text-center">FUB Status</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
                                     <th className="px-6 py-4 text-right">Dashboard Access</th>
                                 </tr>
                             </thead>
@@ -238,17 +237,11 @@ const AgentsPage: React.FC = () => {
                                                     {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm">
+                                            <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
                                                 {formatDate(profile?.start_date)}
                                             </td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm">
+                                            <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
                                                 {formatDate(profile?.anniversary_date)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${agent.status === 'Active' ? 'border-green-500/20 text-green-400 bg-green-500/10' : 'border-slate-500/20 text-slate-400 bg-slate-500/10'
-                                                    }`}>
-                                                    {agent.status}
-                                                </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 {agent.email ? (
