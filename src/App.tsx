@@ -619,7 +619,7 @@ function App() {
         </div>
       </div>
 
-      {isAdmin && <CashFlowPredictor transactions={transactions} />}
+      {authUser?.email === 'ali@questsold.com' && <CashFlowPredictor transactions={transactions} />}
 
       {/* MIDDLE ROW: Leaderboards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full animate-in fade-in duration-500 delay-100">
