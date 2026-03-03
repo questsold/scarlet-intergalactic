@@ -29,6 +29,19 @@ const formatDate = (ts?: number) => {
     return new Date(ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+const getTitleWeight = (title?: string) => {
+    if (!title) return 7; // Default to 'Advisor' level if no title
+    const t = title.toLowerCase();
+    if (t.includes('broker') || t.includes('owner')) return 1;
+    if (t.includes('transaction coordinator') || t.includes('tc') || t === 'tc') return 2;
+    if (t.includes('success manager')) return 3;
+    if (t.includes('pc advisor') || t.includes('principal consultant')) return 4;
+    if (t.includes('exec')) return 5;
+    if (t.includes('senior')) return 6;
+    if (t.includes('advisor') || t.includes('agent')) return 7;
+    return 8; // fallback
+};
+
 const AgentsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [fubAgents, setFubAgents] = useState<FubAgent[]>([]);
@@ -46,7 +59,10 @@ const AgentsPage: React.FC = () => {
                 const agents: FubAgent[] = data.users || [];
 
                 // Filter only questsold agents immediately so we don't over-fetch
-                const questAgents = agents.filter(a => a.email?.toLowerCase().endsWith('@questsold.com'));
+                const questAgents = agents.filter(a => {
+                    const email = a.email?.toLowerCase();
+                    return email && email.endsWith('@questsold.com') && email !== 'info@questsold.com';
+                });
                 setFubAgents(questAgents);
 
                 // 2. Fetch allowed_users from Firestore
@@ -185,7 +201,20 @@ const AgentsPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {fubAgents.sort((a, b) => a.name.localeCompare(b.name)).map(agent => {
+                                {fubAgents.slice().sort((a, b) => {
+                                    const emailKeyA = a.email?.toLowerCase();
+                                    const emailKeyB = b.email?.toLowerCase();
+                                    const titleA = emailKeyA ? btProfiles[emailKeyA]?.title : undefined;
+                                    const titleB = emailKeyB ? btProfiles[emailKeyB]?.title : undefined;
+
+                                    const weightA = getTitleWeight(titleA);
+                                    const weightB = getTitleWeight(titleB);
+
+                                    if (weightA !== weightB) {
+                                        return weightA - weightB;
+                                    }
+                                    return a.name.localeCompare(b.name);
+                                }).map(agent => {
                                     const emailKey = agent.email?.toLowerCase();
                                     const dbAccess = emailKey ? accessMap[emailKey] : null;
                                     const hasAccess = dbAccess?.hasAccess || false;
