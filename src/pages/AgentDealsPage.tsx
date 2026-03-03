@@ -77,9 +77,11 @@ const DealCard: React.FC<{ deal: UnifiedDeal; type: 'pending' | 'closed'; agentN
                         <span className="text-slate-300 font-medium">{formatCurrency(deal.price)}</span>
                     </div>
                     <div className="flex flex-col gap-1">
-                        <span className="text-slate-500 uppercase tracking-wide">U/C Date</span>
+                        <span className="text-slate-500 uppercase tracking-wide">
+                            {deal.status === 'listing' ? 'Active Date' : 'U/C Date'}
+                        </span>
                         <span className="text-slate-300">
-                            {formatDate(deal.acceptance_date || deal.created_at)}
+                            {formatDate(deal.status === 'listing' ? (deal.listing_date || deal.created_at) : (deal.acceptance_date || deal.created_at))}
                         </span>
                     </div>
                     <div className="flex flex-col gap-1">
