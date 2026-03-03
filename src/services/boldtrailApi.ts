@@ -141,6 +141,42 @@ class BoldTrailApi {
             return results;
         }
     }
+
+    /**
+     * Fetches the commissions (office net, agent net, etc) for a batch of transactions.
+     * @param transactionIds Array of BoldTrail transaction IDs (max 200).
+     * @returns A map of transactionId to its office_net and agent_net.
+     */
+    async getTransactionCommissions(transactionIds: number[]): Promise<Record<number, { officeNet: number, agentNet: number }>> {
+        if (!transactionIds || transactionIds.length === 0) return {};
+
+        const chunkSize = 100;
+        const results: Record<number, { officeNet: number, agentNet: number }> = {};
+
+        try {
+            for (let i = 0; i < transactionIds.length; i += chunkSize) {
+                const chunk = transactionIds.slice(i, i + chunkSize);
+                const url = `/api/transaction-commissions?ids=${chunk.join(',')}`;
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    console.error('BoldTrail Commissions API Error:', response.status);
+                    continue; // try next chunk
+                }
+
+                const data = await response.json();
+                Object.assign(results, data);
+            }
+            return results;
+        } catch (e) {
+            console.error('Failed to fetch transaction commissions', e);
+            return results;
+        }
+    }
 }
 
 export const boldtrailApi = new BoldTrailApi();

@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { BoldTrailTransaction } from '../types/boldtrail';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Loader2 } from 'lucide-react';
+import { boldtrailApi } from '../services/boldtrailApi';
 
 interface Props {
     transactions: BoldTrailTransaction[];
@@ -15,6 +16,23 @@ const formatCurrency = (val: number) => {
 };
 
 const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
+    const [commissionsMap, setCommissionsMap] = useState<Record<number, { officeNet: number, agentNet: number }>>({});
+    const [loadingCommissions, setLoadingCommissions] = useState(false);
+
+    useEffect(() => {
+        const pendingTx = transactions.filter(tx => tx.status === 'pending');
+        const ids = pendingTx.map(tx => tx.id);
+
+        if (ids.length > 0) {
+            setLoadingCommissions(true);
+            boldtrailApi.getTransactionCommissions(ids).then(res => {
+                setCommissionsMap(res);
+            }).finally(() => {
+                setLoadingCommissions(false);
+            });
+        }
+    }, [transactions]);
+
     const buckets = useMemo(() => {
         let bucket30 = 0;
         let bucket60 = 0;
@@ -31,9 +49,8 @@ const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
 
         transactions.forEach(tx => {
             if (tx.status === 'pending') {
-                const commission = tx.total_gross_commission || 0;
-                // If closing date is null, we might ignore it or guess? Let's assume it closes in 30 days if null just to be safe, or just ignore. 
-                // Better to ignore if no closing date, or use acceptance date + 30? Usually pending needs closing date. Let's strictly use closing_date.
+                // Use OFFICE_NET instead of total gross commission
+                const commission = commissionsMap[tx.id]?.officeNet || 0;
                 if (tx.closing_date) {
                     if (tx.closing_date <= days30) {
                         bucket30 += commission;
@@ -54,7 +71,7 @@ const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
             bucket60: { amount: bucket60, count: count60 },
             bucket90: { amount: bucket90, count: count90 },
         };
-    }, [transactions]);
+    }, [transactions, commissionsMap]);
 
     return (
         <div className="w-full bg-[#1c2336]/80 rounded-2xl border border-white/5 p-6 mb-6">
@@ -63,8 +80,11 @@ const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
                     <TrendingUp size={16} className="text-green-400" />
                 </div>
                 <div>
-                    <h2 className="text-lg font-bold text-slate-100">Brokerage Cash Flow Predictor</h2>
-                    <p className="text-sm text-slate-400">Projected GCI from active pending pipeline</p>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-lg font-bold text-slate-100">Brokerage Cash Flow Predictor</h2>
+                        {loadingCommissions && <Loader2 size={14} className="text-slate-400 animate-spin" />}
+                    </div>
+                    <p className="text-sm text-slate-400">Projected Net Company Dollar (OFFICE_NET) from active pending pipeline</p>
                 </div>
             </div>
 
