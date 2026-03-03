@@ -123,7 +123,7 @@ const AgentsPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {fubAgents.slice().sort((a, b) => a.name.localeCompare(b.name)).map(agent => {
+                                {fubAgents.filter(agent => agent.email?.toLowerCase().endsWith('@questsold.com')).sort((a, b) => a.name.localeCompare(b.name)).map(agent => {
                                     const emailKey = agent.email?.toLowerCase();
                                     const dbAccess = emailKey ? accessMap[emailKey] : null;
                                     const hasAccess = dbAccess?.hasAccess || false;
