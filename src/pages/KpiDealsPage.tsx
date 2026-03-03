@@ -280,6 +280,10 @@ export const KpiDealsPage: React.FC = () => {
                 const dateA = (a as any).closing_date || (a as any).closed_at || 0;
                 const dateB = (b as any).closing_date || (b as any).closed_at || 0;
                 return new Date(dateB).getTime() - new Date(dateA).getTime();
+            } else if (title === 'Active Listings') {
+                const dateA = (a as any).listing_date || (a as any).created_at || (a as any).createdAt || 0;
+                const dateB = (b as any).listing_date || (b as any).created_at || (b as any).createdAt || 0;
+                return new Date(dateB).getTime() - new Date(dateA).getTime();
             } else {
                 const dateA = (a as any).acceptance_date || (a as any).created_at || (a as any).createdAt || 0;
                 const dateB = (b as any).acceptance_date || (b as any).created_at || (b as any).createdAt || 0;
