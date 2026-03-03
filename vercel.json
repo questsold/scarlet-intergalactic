@@ -7,7 +7,7 @@
     ],
     "build": {
         "env": {
-            "VITE_FIREBASE_API_KEY": "AIzaSyDxQYOtwpcvibgvboCJZT1Y1keQgWrBD_4",
+            "VITE_FIREBASE_API_KEY": "YOUR_FIREBASE_API_KEY",
             "VITE_FIREBASE_AUTH_DOMAIN": "scarlet-intergalactic.firebaseapp.com",
             "VITE_FIREBASE_PROJECT_ID": "scarlet-intergalactic",
             "VITE_FIREBASE_STORAGE_BUCKET": "scarlet-intergalactic.firebasestorage.app",
