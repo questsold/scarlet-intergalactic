@@ -22,6 +22,7 @@ interface BtProfile {
     title?: string;
     phone?: string;
     anniversary_date?: number;
+    start_date?: number;
 }
 
 const formatDate = (ts?: number) => {
@@ -102,7 +103,8 @@ const AgentsPage: React.FC = () => {
                             profileMapByEmail[profile.email.toLowerCase()] = {
                                 title: profile.title,
                                 phone: profile.phone,
-                                anniversary_date: profile.anniversary_date
+                                anniversary_date: profile.anniversary_date,
+                                start_date: profile.start_date
                             };
                         }
                     });
@@ -195,6 +197,7 @@ const AgentsPage: React.FC = () => {
                                     <th className="px-6 py-4">Agent Name</th>
                                     <th className="px-6 py-4">Title</th>
                                     <th className="px-6 py-4">Email & Phone</th>
+                                    <th className="px-6 py-4">Start Date</th>
                                     <th className="px-6 py-4">Rollover Date</th>
                                     <th className="px-6 py-4 text-center">FUB Status</th>
                                     <th className="px-6 py-4 text-right">Dashboard Access</th>
@@ -234,6 +237,9 @@ const AgentsPage: React.FC = () => {
                                                     <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
                                                     {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-400 text-sm">
+                                                {formatDate(profile?.start_date)}
                                             </td>
                                             <td className="px-6 py-4 text-slate-400 text-sm">
                                                 {formatDate(profile?.anniversary_date)}
