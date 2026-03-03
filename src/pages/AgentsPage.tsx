@@ -203,69 +203,99 @@ const AgentsPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {fubAgents.slice().sort((a, b) => {
-                                    const emailKeyA = a.email?.toLowerCase();
-                                    const emailKeyB = b.email?.toLowerCase();
-                                    const titleA = emailKeyA ? btProfiles[emailKeyA]?.title : undefined;
-                                    const titleB = emailKeyB ? btProfiles[emailKeyB]?.title : undefined;
+                                {(() => {
+                                    const adminAgents = fubAgents.filter(a => {
+                                        const emailKey = a.email?.toLowerCase();
+                                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                                        return getTitleWeight(title) <= 3;
+                                    }).sort((a, b) => {
+                                        const titleA = a.email ? btProfiles[a.email.toLowerCase()]?.title : undefined;
+                                        const titleB = b.email ? btProfiles[b.email.toLowerCase()]?.title : undefined;
+                                        const wA = getTitleWeight(titleA);
+                                        const wB = getTitleWeight(titleB);
+                                        if (wA !== wB) return wA - wB;
+                                        return a.name.localeCompare(b.name);
+                                    });
 
-                                    const weightA = getTitleWeight(titleA);
-                                    const weightB = getTitleWeight(titleB);
+                                    const regularAgents = fubAgents.filter(a => {
+                                        const emailKey = a.email?.toLowerCase();
+                                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                                        return getTitleWeight(title) > 3;
+                                    }).sort((a, b) => a.name.localeCompare(b.name));
 
-                                    if (weightA !== weightB) {
-                                        return weightA - weightB;
-                                    }
-                                    return a.name.localeCompare(b.name);
-                                }).map(agent => {
-                                    const emailKey = agent.email?.toLowerCase();
-                                    const dbAccess = emailKey ? accessMap[emailKey] : null;
-                                    const hasAccess = dbAccess?.hasAccess || false;
-                                    const isSaving = saving === emailKey;
-                                    const profile = emailKey ? btProfiles[emailKey] : null;
+                                    const renderAgentRow = (agent: FubAgent) => {
+                                        const emailKey = agent.email?.toLowerCase();
+                                        const dbAccess = emailKey ? accessMap[emailKey] : null;
+                                        const hasAccess = dbAccess?.hasAccess || false;
+                                        const isSaving = saving === emailKey;
+                                        const profile = emailKey ? btProfiles[emailKey] : null;
+
+                                        return (
+                                            <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-slate-200">
+                                                    {agent.name}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm">
+                                                    {profile?.title || <span className="text-slate-600 italic">Agent</span>}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
+                                                        {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                    {formatDate(profile?.start_date)}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                    {formatDate(profile?.anniversary_date)}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {agent.email ? (
+                                                        <button
+                                                            onClick={() => toggleAccess(agent.name, agent.email!)}
+                                                            disabled={isSaving}
+                                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
+                                                                ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
+                                                                : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
+                                                                } disabled:opacity-50`}
+                                                        >
+                                                            {isSaving ? 'Saving...' : hasAccess ? (
+                                                                <><ShieldCheck size={16} /> Revoke Access</>
+                                                            ) : (
+                                                                <><ShieldAlert size={16} /> Grant Access</>
+                                                            )}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-red-400/80 italic">Requires valid email</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    };
 
                                     return (
-                                        <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-200">
-                                                {agent.name}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm">
-                                                {profile?.title || <span className="text-slate-600 italic">Agent</span>}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
-                                                    {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                {formatDate(profile?.start_date)}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                {formatDate(profile?.anniversary_date)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                {agent.email ? (
-                                                    <button
-                                                        onClick={() => toggleAccess(agent.name, agent.email!)}
-                                                        disabled={isSaving}
-                                                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${hasAccess
-                                                            ? 'bg-blue-500/10 text-blue-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20'
-                                                            : 'bg-white/5 text-slate-300 hover:bg-blue-500 hover:text-white border border-white/10'
-                                                            } disabled:opacity-50`}
-                                                    >
-                                                        {isSaving ? 'Saving...' : hasAccess ? (
-                                                            <><ShieldCheck size={16} /> Revoke Access</>
-                                                        ) : (
-                                                            <><ShieldAlert size={16} /> Grant Access</>
-                                                        )}
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-xs text-red-400/80 italic">Requires valid email</span>
-                                                )}
-                                            </td>
-                                        </tr>
+                                        <>
+                                            {adminAgents.length > 0 && (
+                                                <tr className="bg-slate-800/50">
+                                                    <td colSpan={6} className="px-6 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                                        Leadership & Support
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {adminAgents.map(renderAgentRow)}
+
+                                            {regularAgents.length > 0 && (
+                                                <tr className="bg-slate-800/50 border-t border-white/5">
+                                                    <td colSpan={6} className="px-6 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                                        Advisors
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {regularAgents.map(renderAgentRow)}
+                                        </>
                                     );
-                                })}
+                                })()}
                             </tbody>
                         </table>
                         {fubAgents.length === 0 && (
