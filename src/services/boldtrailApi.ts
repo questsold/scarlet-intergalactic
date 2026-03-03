@@ -1,0 +1,146 @@
+import type { BoldTrailTransaction, BoldTrailUser } from '../types/boldtrail';
+
+class BoldTrailApi {
+    /**
+     * Fetches all users from BoldTrail Backoffice
+     */
+    async getUsers(limit: number = 10000): Promise<BoldTrailUser[]> {
+        const allUsers: BoldTrailUser[] = [];
+        let startingFromId: number | undefined = undefined;
+        const batchSize = 1000;
+
+        try {
+            while (allUsers.length < limit) {
+                let url = `/api/bt-users?count=${batchSize}`;
+                if (startingFromId) {
+                    url += `&starting_from_id=${startingFromId}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('BoldTrail Users API Error:', response.status, errorText);
+                    break;
+                }
+
+                const data: BoldTrailUser[] = await response.json();
+
+                if (!data || data.length === 0) {
+                    break;
+                }
+
+                allUsers.push(...data);
+
+                if (data.length < batchSize) {
+                    break;
+                }
+
+                startingFromId = data[data.length - 1].id;
+            }
+
+            return allUsers.slice(0, limit);
+        } catch (e) {
+            console.error('Failed to fetch users from BoldTrail', e);
+            return [];
+        }
+    }
+    /**
+     * Fetches all transactions from BoldTrail Backoffice using the local Vercel proxy.
+     * Note: The boldtrail transactions API limits to 1000 items per request max,
+     * we will fetch up to max pages or as requested.
+     */
+    async getTransactions(limit: number = 10000): Promise<BoldTrailTransaction[]> {
+        const allTransactions: BoldTrailTransaction[] = [];
+        let startingFromId: number | undefined = undefined;
+        const batchSize = 1000;
+
+        try {
+            while (allTransactions.length < limit) {
+                let url = `/api/transactions?count=${batchSize}`;
+                if (startingFromId) {
+                    url += `&starting_from_id=${startingFromId}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('BoldTrail Transactions API Error:', response.status, errorText);
+                    break;
+                }
+
+                const data: BoldTrailTransaction[] = await response.json();
+
+                if (!data || data.length === 0) {
+                    break;
+                }
+
+                allTransactions.push(...data);
+
+                if (data.length < batchSize) {
+                    break; // Last page
+                }
+
+                // The boldtrail API uses starting_from_id based on the lowest ID returned
+                // Assuming the list is ordered descending by ID as default.
+                // If sorting asc, it would be the highest. The documentation states "starting from" id.
+                startingFromId = data[data.length - 1].id;
+            }
+
+            return allTransactions.slice(0, limit);
+        } catch (e) {
+            console.error('Failed to fetch transactions from BoldTrail', e);
+            return [];
+        }
+    }
+
+    /**
+     * Fetches the participants (agents) for a batch of transactions.
+     * @param transactionIds Array of BoldTrail transaction IDs (max 200).
+     * @returns A map of transactionId to an array of BoldTrailUser.
+     */
+    async getTransactionParticipants(transactionIds: number[]): Promise<Record<number, BoldTrailUser[]>> {
+        if (!transactionIds || transactionIds.length === 0) return {};
+
+        // Chunk into max 100 per request
+        const chunkSize = 100;
+        const results: Record<number, BoldTrailUser[]> = {};
+
+        try {
+            for (let i = 0; i < transactionIds.length; i += chunkSize) {
+                const chunk = transactionIds.slice(i, i + chunkSize);
+                const url = `/api/transaction-participants?ids=${chunk.join(',')}`;
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    console.error('BoldTrail Participants API Error:', response.status);
+                    continue; // try next chunk
+                }
+
+                const data = await response.json();
+                Object.assign(results, data);
+            }
+            return results;
+        } catch (e) {
+            console.error('Failed to fetch transaction participants', e);
+            return results;
+        }
+    }
+}
+
+export const boldtrailApi = new BoldTrailApi();

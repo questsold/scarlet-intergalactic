@@ -1,0 +1,23 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/$1"
+        }
+    ],
+    "build": {
+        "env": {
+            "VITE_FIREBASE_API_KEY": "AIzaSyDxQYOtwpcvibgvboCJZT1Y1keQgWrBD_4",
+            "VITE_FIREBASE_AUTH_DOMAIN": "scarlet-intergalactic.firebaseapp.com",
+            "VITE_FIREBASE_PROJECT_ID": "scarlet-intergalactic",
+            "VITE_FIREBASE_STORAGE_BUCKET": "scarlet-intergalactic.firebasestorage.app",
+            "VITE_FIREBASE_MESSAGING_SENDER_ID": "158258066770",
+            "VITE_FIREBASE_APP_ID": "1:158258066770:web:fedbb20fbe76e266de368b"
+        }
+    },
+    "functions": {
+        "api/deals.js": {
+            "maxDuration": 60
+        }
+    }
+}
