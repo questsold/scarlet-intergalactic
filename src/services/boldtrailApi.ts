@@ -62,7 +62,7 @@ class BoldTrailApi {
 
         try {
             while (allTransactions.length < limit) {
-                let url = `/api/transactions?count=${batchSize}`;
+                let url = `/api/transactions?count=${batchSize}&sort_by=created_at&sort_order=desc`;
                 if (startingFromId) {
                     url += `&starting_from_id=${startingFromId}`;
                 }
