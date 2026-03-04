@@ -23,7 +23,7 @@ const MarketingPage: React.FC = () => {
     useEffect(() => {
         const loadTransactions = async () => {
             try {
-                const txs = await boldtrailApi.getTransactions(5000);
+                const txs = await boldtrailApi.getTransactions(1000);
                 setTransactions(txs);
             } catch (error) {
                 console.error("Error loading transactions", error);
