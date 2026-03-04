@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, X } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
 import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
-
-type StatusFilter = 'All' | 'Active' | 'Under Contract' | 'Closed' | 'Cancelled';
+import { MultiSelect } from '../components/MultiSelect';
 
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -15,8 +14,8 @@ const TransactionsPage: React.FC = () => {
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
-    const [agentFilter, setAgentFilter] = useState<string>('All');
+    const [statusFilter, setStatusFilter] = useState<string[]>([]);
+    const [agentFilter, setAgentFilter] = useState<string[]>([]);
     const [timeframe, setTimeframe] = useState<Timeframe>('This Month');
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
@@ -81,20 +80,21 @@ const TransactionsPage: React.FC = () => {
             }
 
             // Status filter
-            if (statusFilter !== 'All') {
+            if (statusFilter.length > 0) {
                 const statusMap: Record<string, string> = {
-                    'Active': 'listing',
+                    'Active Listings': 'listing',
                     'Under Contract': 'pending',
                     'Closed': 'closed',
                     'Cancelled': 'cancelled'
                 };
-                if (tx.status !== statusMap[statusFilter]) return false;
+                const allowedStatuses = statusFilter.map(sf => statusMap[sf]);
+                if (!allowedStatuses.includes(tx.status)) return false;
             }
 
             // Agent filter
-            if (agentFilter !== 'All') {
-                const isBuyingAgent = tx.buying_side_representer?.id === Number(agentFilter);
-                const isListingAgent = tx.listing_side_representer?.id === Number(agentFilter);
+            if (agentFilter.length > 0) {
+                const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
+                const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
                 if (!isBuyingAgent && !isListingAgent) return false;
             }
 
@@ -156,29 +156,45 @@ const TransactionsPage: React.FC = () => {
                     />
 
                     {/* Status Filter */}
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                        className="w-full md:w-48 bg-slate-900/50 border border-white/10 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                    >
-                        <option value="All">All Statuses</option>
-                        <option value="Active">Active Listings</option>
-                        <option value="Under Contract">Under Contract</option>
-                        <option value="Closed">Closed</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
+                    <div className="md:w-48">
+                        <MultiSelect
+                            options={[
+                                { label: 'Active Listings', value: 'Active Listings' },
+                                { label: 'Under Contract', value: 'Under Contract' },
+                                { label: 'Closed', value: 'Closed' },
+                                { label: 'Cancelled', value: 'Cancelled' }
+                            ]}
+                            selectedValues={statusFilter}
+                            onChange={setStatusFilter}
+                            placeholder="All Statuses"
+                        />
+                    </div>
 
                     {/* Agent Filter */}
-                    <select
-                        value={agentFilter}
-                        onChange={(e) => setAgentFilter(e.target.value)}
-                        className="w-full md:w-64 bg-slate-900/50 border border-white/10 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    <div className="md:w-64">
+                        <MultiSelect
+                            options={agents.map(a => ({ label: a.name, value: String(a.id) }))}
+                            selectedValues={agentFilter}
+                            onChange={setAgentFilter}
+                            placeholder="All Agents"
+                        />
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    <button
+                        onClick={() => {
+                            setSearchQuery('');
+                            setStatusFilter([]);
+                            setAgentFilter([]);
+                            setTimeframe('This Month');
+                            setCustomStartDate('');
+                            setCustomEndDate('');
+                        }}
+                        className="p-2 ml-1 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-slate-200"
+                        title="Clear Filters"
                     >
-                        <option value="All">All Agents</option>
-                        {agents.map(a => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                    </select>
+                        <X size={20} />
+                    </button>
                 </div>
 
                 {/* Results Table */}
@@ -195,15 +211,16 @@ const TransactionsPage: React.FC = () => {
                                 <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                                     <th className="px-6 py-4">Address</th>
                                     <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Price / Volume</th>
                                     <th className="px-6 py-4">Agent Name</th>
+                                    <th className="px-6 py-4">Price / Volume</th>
+                                    <th className="px-6 py-4">Closing Date</th>
                                     <th className="px-6 py-4 text-right">BackOffice</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500 italic">
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500 italic">
                                             No transactions match your filters.
                                         </td>
                                     </tr>
@@ -228,11 +245,14 @@ const TransactionsPage: React.FC = () => {
                                                         {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status}
                                                     </span>
                                                 </td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm">
+                                                    {agentName}
+                                                </td>
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                                                     ${(tx.price || tx.sales_volume || 0).toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-400 text-sm">
-                                                    {agentName}
+                                                    {tx.closing_date ? new Date(tx.closing_date > 9999999999 ? tx.closing_date : tx.closing_date * 1000).toLocaleDateString() : '-'}
                                                 </td>
                                                 <td className="px-6 py-4 flex justify-end">
                                                     <a
