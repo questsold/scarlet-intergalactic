@@ -15,7 +15,7 @@ const TransactionsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
     const [agentFilter, setAgentFilter] = useState<string[]>([]);
-    const [timeframe, setTimeframe] = useState<Timeframe>('This Month');
+    const [timeframe, setTimeframe] = useState<Timeframe>('This Year');
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -226,7 +226,7 @@ const TransactionsPage: React.FC = () => {
                             setSearchQuery('');
                             setStatusFilter(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
                             setAgentFilter([]);
-                            setTimeframe('This Month');
+                            setTimeframe('This Year');
                             setCustomStartDate('');
                             setCustomEndDate('');
                         }}
