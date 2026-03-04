@@ -91,16 +91,24 @@ const TransactionsPage: React.FC = () => {
 
             // Status filter
             if (statusFilter.length > 0) {
-                const statusMap: Record<string, string> = {
-                    'Active Listings': 'listing',
-                    'Under Contract': 'pending',
-                    'Closed': 'closed',
-                    'Cancelled': 'cancelled',
-                    'Pre-Listing': 'pre_listing',
-                    'Opportunities': 'opportunity'
-                };
-                const allowedStatuses = statusFilter.map(sf => statusMap[sf]);
-                if (!allowedStatuses.includes(tx.status)) return false;
+                const isSelected = (statusName: string) => statusFilter.includes(statusName);
+
+                let matchesStatus = false;
+
+                if (isSelected('Active Listings') && tx.status === 'listing') matchesStatus = true;
+                if (isSelected('Under Contract') && tx.status === 'pending') matchesStatus = true;
+                if (isSelected('Closed') && tx.status === 'closed') matchesStatus = true;
+                if (isSelected('Cancelled') && tx.status === 'cancelled') matchesStatus = true;
+
+                if (tx.status === 'opportunity') {
+                    if (isSelected('Pre-Listing') && (tx.representing === 'seller' || tx.representing === 'both')) matchesStatus = true;
+                    if (isSelected('Opportunities') && tx.representing === 'buyer') matchesStatus = true;
+                }
+
+                // Keep backward compatibility just in case there's an exact 'pre_listing' status
+                if (isSelected('Pre-Listing') && tx.status === 'pre_listing') matchesStatus = true;
+
+                if (!matchesStatus) return false;
             }
 
             // Agent filter
@@ -291,10 +299,11 @@ const TransactionsPage: React.FC = () => {
                                                         tx.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20' :
                                                             tx.status === 'closed' ? 'bg-green-400/10 text-green-400 ring-green-400/20' :
                                                                 tx.status === 'pre_listing' ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
-                                                                    tx.status === 'opportunity' ? 'bg-orange-400/10 text-orange-400 ring-orange-400/20' :
-                                                                        'bg-red-400/10 text-red-400 ring-red-400/20'
+                                                                    (tx.status === 'opportunity' && (tx.representing === 'seller' || tx.representing === 'both')) ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
+                                                                        (tx.status === 'opportunity' && tx.representing === 'buyer') ? 'bg-orange-400/10 text-orange-400 ring-orange-400/20' :
+                                                                            'bg-red-400/10 text-red-400 ring-red-400/20'
                                                         }`}>
-                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status === 'pre_listing' ? 'pre-listing' : tx.status}
+                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status === 'pre_listing' ? 'pre-listing' : (tx.status === 'opportunity' && (tx.representing === 'seller' || tx.representing === 'both')) ? 'pre-listing' : tx.status}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-400 text-sm">
