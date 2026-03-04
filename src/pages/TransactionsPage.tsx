@@ -23,18 +23,32 @@ const TransactionsPage: React.FC = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                // Fetch agents
+                // Fetch FUB agents
+                const response = await fetch('/api/users');
+                const data = response.ok ? await response.json() : { users: [] };
+                const fubAgents = data.users || [];
+
+                // Filter valid questsold emails + Ali
+                const questAgentEmails = fubAgents.filter((a: any) => {
+                    const email = a.email?.toLowerCase();
+                    return email && email.endsWith('@questsold.com') && email !== 'info@questsold.com';
+                }).map((a: any) => a.email?.toLowerCase());
+
+                if (!questAgentEmails.includes('ali@questsold.com')) {
+                    questAgentEmails.push('ali@questsold.com');
+                }
+
+                // Fetch BT agents
                 const btUsers = await boldtrailApi.getUsers();
 
-                // Exclude leadership
-                const excludedEmails = ['ali@questsold.com', 'nancysteele@questsold.com', 'lillian@questsold.com'];
-
                 const validAgents = btUsers.filter(u => {
-                    if (u.email === 'ali@questsold.com') return true; // Include me
-                    if (u.email && excludedEmails.includes(u.email.toLowerCase())) return false;
-                    return true;
+                    if (u.email && questAgentEmails.includes(u.email.toLowerCase())) {
+                        return true;
+                    }
+                    return false;
                 });
 
+                validAgents.sort((a, b) => a.name.localeCompare(b.name));
                 setAgents(validAgents);
 
                 // Fetch transactions
@@ -179,9 +193,9 @@ const TransactionsPage: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset capitalize ${tx.status === 'listing' ? 'bg-blue-400/10 text-blue-400 ring-blue-400/20' :
-                                                            tx.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20' :
-                                                                tx.status === 'closed' ? 'bg-green-400/10 text-green-400 ring-green-400/20' :
-                                                                    'bg-red-400/10 text-red-400 ring-red-400/20'
+                                                        tx.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20' :
+                                                            tx.status === 'closed' ? 'bg-green-400/10 text-green-400 ring-green-400/20' :
+                                                                'bg-red-400/10 text-red-400 ring-red-400/20'
                                                         }`}>
                                                         {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status}
                                                     </span>
