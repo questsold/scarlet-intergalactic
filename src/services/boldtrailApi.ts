@@ -106,6 +106,42 @@ class BoldTrailApi {
     }
 
     /**
+     * Fetches additional profile details for agents using the local Vercel proxy.
+     * @param userIds Array of BoldTrail user IDs.
+     * @returns A map of userId to user details.
+     */
+    async getUserDetails(userIds: number[]): Promise<Record<number, any>> {
+        if (!userIds || userIds.length === 0) return {};
+
+        const chunkSize = 50;
+        const results: Record<number, any> = {};
+
+        try {
+            for (let i = 0; i < userIds.length; i += chunkSize) {
+                const chunk = userIds.slice(i, i + chunkSize);
+                const url = `/api/bt-user-details?ids=${chunk.join(',')}`;
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    console.error('BoldTrail User Details API Error:', response.status);
+                    continue;
+                }
+
+                const data = await response.json();
+                Object.assign(results, data);
+            }
+            return results;
+        } catch (e) {
+            console.error('Failed to fetch user details', e);
+            return results;
+        }
+    }
+
+    /**
      * Fetches the participants (agents) for a batch of transactions.
      * @param transactionIds Array of BoldTrail transaction IDs (max 200).
      * @returns A map of transactionId to an array of BoldTrailUser.
