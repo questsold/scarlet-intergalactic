@@ -12,9 +12,8 @@ const TransactionsPage: React.FC = () => {
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
     const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
 
-    // Filters
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string[]>([]);
+    const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
     const [agentFilter, setAgentFilter] = useState<string[]>([]);
     const [timeframe, setTimeframe] = useState<Timeframe>('This Month');
     const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -85,7 +84,9 @@ const TransactionsPage: React.FC = () => {
                     'Active Listings': 'listing',
                     'Under Contract': 'pending',
                     'Closed': 'closed',
-                    'Cancelled': 'cancelled'
+                    'Cancelled': 'cancelled',
+                    'Pre-Listing': 'active',
+                    'Opportunities': 'opportunity'
                 };
                 const allowedStatuses = statusFilter.map(sf => statusMap[sf]);
                 if (!allowedStatuses.includes(tx.status)) return false;
@@ -162,7 +163,9 @@ const TransactionsPage: React.FC = () => {
                                 { label: 'Active Listings', value: 'Active Listings' },
                                 { label: 'Under Contract', value: 'Under Contract' },
                                 { label: 'Closed', value: 'Closed' },
-                                { label: 'Cancelled', value: 'Cancelled' }
+                                { label: 'Cancelled', value: 'Cancelled' },
+                                { label: 'Pre-Listing', value: 'Pre-Listing' },
+                                { label: 'Opportunities', value: 'Opportunities' }
                             ]}
                             selectedValues={statusFilter}
                             onChange={setStatusFilter}
@@ -184,7 +187,7 @@ const TransactionsPage: React.FC = () => {
                     <button
                         onClick={() => {
                             setSearchQuery('');
-                            setStatusFilter([]);
+                            setStatusFilter(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
                             setAgentFilter([]);
                             setTimeframe('This Month');
                             setCustomStartDate('');
