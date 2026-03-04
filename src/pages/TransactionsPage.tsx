@@ -3,6 +3,8 @@ import DashboardLayout from '../components/DashboardLayout';
 import { Search, Loader2 } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
+import TimeframeSelector from '../components/TimeframeSelector';
+import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
 
 type StatusFilter = 'All' | 'Active' | 'Under Contract' | 'Closed' | 'Cancelled';
 
@@ -15,10 +17,10 @@ const TransactionsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
     const [agentFilter, setAgentFilter] = useState<string>('All');
-
-    // Default timeframe to this month logic can be applied if we implement a date filter, 
-    // but the API fetching currently gathers all or relies on the unified fetching.
-    // For now, we'll fetch a broad set or just what's available and filter locally.
+    const [timeframe, setTimeframe] = useState<Timeframe>('This Month');
+    const [customStartDate, setCustomStartDate] = useState<string>('');
+    const [customEndDate, setCustomEndDate] = useState<string>('');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -64,7 +66,13 @@ const TransactionsPage: React.FC = () => {
     }, []);
 
     const filteredTransactions = useMemo(() => {
-        return transactions.filter(tx => {
+        let result = transactions;
+
+        // Apply timeframe filter based on created_at
+        result = filterByTimeframe(result, timeframe, customStartDate, customEndDate);
+
+        // Apply secondary filters
+        result = result.filter(tx => {
             // Search query filter (Address)
             if (searchQuery) {
                 const searchLower = searchQuery.toLowerCase();
@@ -92,7 +100,16 @@ const TransactionsPage: React.FC = () => {
 
             return true;
         });
-    }, [transactions, searchQuery, statusFilter, agentFilter]);
+
+        // Sort newest to oldest
+        result.sort((a, b) => {
+            const dateA = a.created_at || 0;
+            const dateB = b.created_at || 0;
+            return dateB - dateA;
+        });
+
+        return result;
+    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate]);
 
     if (loading) {
         return (
@@ -114,9 +131,9 @@ const TransactionsPage: React.FC = () => {
                 </div>
 
                 {/* Filters */}
-                <div className="glass-card p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center bg-[#1c2336] border border-white/5">
+                <div className="glass-card p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center bg-[#1c2336] border border-white/5 flex-wrap">
                     {/* Search */}
-                    <div className="relative flex-1 w-full">
+                    <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
@@ -126,6 +143,17 @@ const TransactionsPage: React.FC = () => {
                             className="w-full bg-slate-900/50 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                         />
                     </div>
+
+                    <TimeframeSelector
+                        timeframe={timeframe}
+                        setTimeframe={setTimeframe}
+                        customStartDate={customStartDate}
+                        setCustomStartDate={setCustomStartDate}
+                        customEndDate={customEndDate}
+                        setCustomEndDate={setCustomEndDate}
+                        isDropdownOpen={isDropdownOpen}
+                        setIsDropdownOpen={setIsDropdownOpen}
+                    />
 
                     {/* Status Filter */}
                     <select

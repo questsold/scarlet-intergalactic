@@ -1,6 +1,6 @@
 export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
 
-export const filterByTimeframe = <T extends { created: string } | { createdAt: string }>(
+export const filterByTimeframe = <T extends { created?: string, createdAt?: string, created_at?: number }>(
     data: T[],
     timeframe: Timeframe,
     customStartDate?: string,
@@ -64,8 +64,8 @@ export const filterByTimeframe = <T extends { created: string } | { createdAt: s
     }
 
     return data.filter(item => {
-        const itemDateStr = 'createdAt' in item ? (item as any).createdAt : item.created;
-        const itemDate = new Date(itemDateStr);
+        const itemDateVal = 'createdAt' in item ? (item as any).createdAt : ('created_at' in item ? (item as any).created_at : (item as any).created);
+        const itemDate = new Date(itemDateVal);
 
         let isValid = true;
         if (startDate) isValid = isValid && itemDate >= startDate;
