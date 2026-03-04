@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { Search, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
-import type { BoldTrailTransaction } from '../types/boldtrail';
+import type { BoldTrailTransaction, BoldTrailUser } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
 import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
 import { MultiSelect } from '../components/MultiSelect';
@@ -11,6 +11,7 @@ const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
     const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
+    const [participantsMap, setParticipantsMap] = useState<Record<number, BoldTrailUser[]>>({});
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -65,6 +66,13 @@ const TransactionsPage: React.FC = () => {
                 // Fetch transactions
                 const txs = await boldtrailApi.getTransactions();
                 setTransactions(txs);
+
+                // Fetch participants for these transactions to identify owners
+                if (txs.length > 0) {
+                    const txIds = txs.map(tx => tx.id);
+                    const pMap = await boldtrailApi.getTransactionParticipants(txIds);
+                    setParticipantsMap(pMap);
+                }
             } catch (err) {
                 console.error("Error loading transactions:", err);
             } finally {
@@ -110,9 +118,18 @@ const TransactionsPage: React.FC = () => {
 
             // Agent filter
             if (agentFilter.length > 0) {
-                const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
-                const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
-                if (!isBuyingAgent && !isListingAgent) return false;
+                const txParticipants = participantsMap[tx.id] || [];
+                const owner = txParticipants.find(p => p.owner);
+                if (owner && owner.email) {
+                    if (!agentFilter.includes(String(owner.id)) && !agentFilter.includes(owner.email.toLowerCase())) {
+                        return false;
+                    }
+                } else {
+                    // Fallback to representer IDs if no owner found
+                    const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
+                    const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
+                    if (!isBuyingAgent && !isListingAgent) return false;
+                }
             }
 
             return true;
@@ -125,13 +142,27 @@ const TransactionsPage: React.FC = () => {
                 let bValue: any = b[sortConfig.key as keyof typeof b];
 
                 if (sortConfig.key === 'agentName') {
-                    const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
-                    const foundAgentA = agents.find(ag => ag.id === agentIdA);
-                    aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
+                    const txParticipantsA = participantsMap[a.id] || [];
+                    const ownerA = txParticipantsA.find(p => p.owner);
+                    if (ownerA && ownerA.email) {
+                        const matchedAgent = agents.find(ag => ag.email?.toLowerCase() === ownerA.email.toLowerCase());
+                        aValue = matchedAgent ? matchedAgent.name : ownerA.name;
+                    } else {
+                        const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
+                        const foundAgentA = agents.find(ag => ag.id === agentIdA);
+                        aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
+                    }
 
-                    const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
-                    const foundAgentB = agents.find(ag => ag.id === agentIdB);
-                    bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
+                    const txParticipantsB = participantsMap[b.id] || [];
+                    const ownerB = txParticipantsB.find(p => p.owner);
+                    if (ownerB && ownerB.email) {
+                        const matchedAgent = agents.find(ag => ag.email?.toLowerCase() === ownerB.email.toLowerCase());
+                        bValue = matchedAgent ? matchedAgent.name : ownerB.name;
+                    } else {
+                        const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
+                        const foundAgentB = agents.find(ag => ag.id === agentIdB);
+                        bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
+                    }
                 } else if (sortConfig.key === 'price') {
                     aValue = a.price || a.sales_volume || 0;
                     bValue = b.price || b.sales_volume || 0;
@@ -285,9 +316,18 @@ const TransactionsPage: React.FC = () => {
                                 ) : (
                                     filteredTransactions.map(tx => {
                                         // Try to find the agent name locally from our fetched agents
-                                        const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
-                                        const foundAgent = agents.find(a => a.id === agentId);
-                                        const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
+                                        const txParticipants = participantsMap[tx.id] || [];
+                                        const owner = txParticipants.find(p => p.owner);
+                                        let agentName = 'Unknown Agent';
+
+                                        if (owner && owner.email) {
+                                            const matchedAgent = agents.find(a => a.email?.toLowerCase() === owner.email.toLowerCase());
+                                            agentName = matchedAgent ? matchedAgent.name : owner.name;
+                                        } else {
+                                            const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
+                                            const foundAgent = agents.find(a => a.id === agentId);
+                                            agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
+                                        }
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
