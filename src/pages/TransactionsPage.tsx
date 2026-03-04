@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
@@ -19,6 +19,17 @@ const TransactionsPage: React.FC = () => {
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+    // Sort logic
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -102,15 +113,41 @@ const TransactionsPage: React.FC = () => {
             return true;
         });
 
-        // Sort newest to oldest
-        result.sort((a, b) => {
-            const dateA = a.created_at || 0;
-            const dateB = b.created_at || 0;
-            return dateB - dateA;
-        });
+        // Apply sorting
+        if (sortConfig) {
+            result.sort((a, b) => {
+                let aValue: any = a[sortConfig.key as keyof typeof a];
+                let bValue: any = b[sortConfig.key as keyof typeof b];
+
+                if (sortConfig.key === 'agentName') {
+                    const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
+                    const foundAgentA = agents.find(ag => ag.id === agentIdA);
+                    aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
+
+                    const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
+                    const foundAgentB = agents.find(ag => ag.id === agentIdB);
+                    bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
+                } else if (sortConfig.key === 'price') {
+                    aValue = a.price || a.sales_volume || 0;
+                    bValue = b.price || b.sales_volume || 0;
+                } else {
+                    // fallbacks
+                    aValue = aValue ?? '';
+                    bValue = bValue ?? '';
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
 
         return result;
-    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate]);
+    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents]);
 
     if (loading) {
         return (
@@ -211,12 +248,22 @@ const TransactionsPage: React.FC = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
-                                    <th className="px-6 py-4">Address</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Agent Name</th>
-                                    <th className="px-6 py-4">Price / Volume</th>
-                                    <th className="px-6 py-4">Closing Date</th>
+                                <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5 select-none">
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('address')}>
+                                        <div className="flex items-center gap-1">Address {sortConfig.key === 'address' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('status')}>
+                                        <div className="flex items-center gap-1">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('agentName')}>
+                                        <div className="flex items-center gap-1">Agent {sortConfig.key === 'agentName' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('price')}>
+                                        <div className="flex items-center gap-1">Price / Vol {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('closing_date')}>
+                                        <div className="flex items-center gap-1">Closing {sortConfig.key === 'closing_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
                                     <th className="px-6 py-4 text-right">BackOffice</th>
                                 </tr>
                             </thead>
