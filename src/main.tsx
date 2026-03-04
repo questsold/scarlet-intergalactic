@@ -10,6 +10,7 @@ import AgentsPage from './pages/AgentsPage.tsx'
 import ReportsPage from './pages/ReportsPage.tsx'
 import KpiDealsPage from './pages/KpiDealsPage.tsx'
 import MarketingPage from './pages/MarketingPage.tsx'
+import TransactionsPage from './pages/TransactionsPage.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
 
 createRoot(document.getElementById('root')!).render(
@@ -40,6 +41,11 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/agent/:agentName" element={
           <ProtectedRoute>
             <AgentDealsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/transactions" element={
+          <ProtectedRoute>
+            <TransactionsPage />
           </ProtectedRoute>
         } />
         <Route path="/marketing" element={
