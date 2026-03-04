@@ -100,13 +100,10 @@ const TransactionsPage: React.FC = () => {
                 if (isSelected('Closed') && tx.status === 'closed') matchesStatus = true;
                 if (isSelected('Cancelled') && tx.status === 'cancelled') matchesStatus = true;
 
-                if (tx.status === 'opportunity') {
+                if (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') {
                     if (isSelected('Pre-Listing') && (tx.representing === 'seller' || tx.representing === 'both')) matchesStatus = true;
                     if (isSelected('Opportunities') && tx.representing === 'buyer') matchesStatus = true;
                 }
-
-                // Keep backward compatibility just in case there's an exact 'pre_listing' status
-                if (isSelected('Pre-Listing') && tx.status === 'pre_listing') matchesStatus = true;
 
                 if (!matchesStatus) return false;
             }
@@ -269,6 +266,9 @@ const TransactionsPage: React.FC = () => {
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('price')}>
                                         <div className="flex items-center gap-1">Price / Vol {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('created_at')}>
+                                        <div className="flex items-center gap-1">Created {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    </th>
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('closing_date')}>
                                         <div className="flex items-center gap-1">Closing {sortConfig.key === 'closing_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
@@ -278,7 +278,7 @@ const TransactionsPage: React.FC = () => {
                             <tbody>
                                 {filteredTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500 italic">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500 italic">
                                             No transactions match your filters.
                                         </td>
                                     </tr>
@@ -289,6 +289,9 @@ const TransactionsPage: React.FC = () => {
                                         const foundAgent = agents.find(a => a.id === agentId);
                                         const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
 
+                                        const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
+                                        const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
+
                                         return (
                                             <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                                 <td className="px-6 py-4 font-medium text-slate-200">
@@ -298,12 +301,11 @@ const TransactionsPage: React.FC = () => {
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset capitalize whitespace-nowrap ${tx.status === 'listing' ? 'bg-blue-400/10 text-blue-400 ring-blue-400/20' :
                                                         tx.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20' :
                                                             tx.status === 'closed' ? 'bg-green-400/10 text-green-400 ring-green-400/20' :
-                                                                tx.status === 'pre_listing' ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
-                                                                    (tx.status === 'opportunity' && (tx.representing === 'seller' || tx.representing === 'both')) ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
-                                                                        (tx.status === 'opportunity' && tx.representing === 'buyer') ? 'bg-orange-400/10 text-orange-400 ring-orange-400/20' :
-                                                                            'bg-red-400/10 text-red-400 ring-red-400/20'
+                                                                isOppSeller ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
+                                                                    isOppBuyer ? 'bg-orange-400/10 text-orange-400 ring-orange-400/20' :
+                                                                        'bg-red-400/10 text-red-400 ring-red-400/20'
                                                         }`}>
-                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status === 'pre_listing' ? 'pre-listing' : (tx.status === 'opportunity' && (tx.representing === 'seller' || tx.representing === 'both')) ? 'pre-listing' : tx.status}
+                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : isOppSeller ? 'pre-listing' : isOppBuyer ? 'opportunity' : tx.status}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-400 text-sm">
@@ -312,7 +314,10 @@ const TransactionsPage: React.FC = () => {
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                                                     ${(tx.price || tx.sales_volume || 0).toLocaleString()}
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm">
+                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                    {tx.created_at ? new Date(tx.created_at > 9999999999 ? tx.created_at : tx.created_at * 1000).toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
                                                     {tx.closing_date ? new Date(tx.closing_date > 9999999999 ? tx.closing_date : tx.closing_date * 1000).toLocaleDateString() : '-'}
                                                 </td>
                                                 <td className="px-6 py-4 flex justify-end">
