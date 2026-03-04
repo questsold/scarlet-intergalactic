@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction, BoldTrailUser } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
@@ -20,6 +20,10 @@ const TransactionsPage: React.FC = () => {
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 100;
 
     // Sort logic
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
@@ -66,13 +70,7 @@ const TransactionsPage: React.FC = () => {
                 // Fetch transactions
                 const txs = await boldtrailApi.getTransactions();
                 setTransactions(txs);
-
-                // Fetch participants for these transactions to identify owners
-                if (txs.length > 0) {
-                    const txIds = txs.map(tx => tx.id);
-                    const pMap = await boldtrailApi.getTransactionParticipants(txIds);
-                    setParticipantsMap(pMap);
-                }
+                // No more fetching all participants here - we will fetch paged instead
             } catch (err) {
                 console.error("Error loading transactions:", err);
             } finally {
@@ -82,8 +80,13 @@ const TransactionsPage: React.FC = () => {
         fetchInitialData();
     }, []);
 
+    // Effect: Reset to Page 1 when search/filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate]);
+
     const filteredTransactions = useMemo(() => {
-        let result = transactions;
+        let result = [...transactions]; // Copy to avoid mutation during sort
 
         // Apply timeframe filter based on created_at
         result = filterByTimeframe(result, timeframe, customStartDate, customEndDate);
@@ -167,23 +170,41 @@ const TransactionsPage: React.FC = () => {
                     aValue = a.price || a.sales_volume || 0;
                     bValue = b.price || b.sales_volume || 0;
                 } else {
-                    // fallbacks
                     aValue = aValue ?? '';
                     bValue = bValue ?? '';
                 }
 
-                if (aValue < bValue) {
-                    return sortConfig.direction === 'asc' ? -1 : 1;
-                }
-                if (aValue > bValue) {
-                    return sortConfig.direction === 'asc' ? 1 : -1;
-                }
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
                 return 0;
             });
         }
 
         return result;
-    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents]);
+    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents, participantsMap]);
+
+    // Derived pagination info
+    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+    const paginatedTransactions = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredTransactions.slice(start, start + itemsPerPage);
+    }, [filteredTransactions, currentPage]);
+
+    // Effect: Fetch participants for the visible page
+    useEffect(() => {
+        if (paginatedTransactions.length === 0) return;
+
+        const missingIds = paginatedTransactions
+            .map(tx => tx.id)
+            .filter(id => !participantsMap[id]);
+
+        if (missingIds.length > 0) {
+            boldtrailApi.getTransactionParticipants(missingIds).then(newPMap => {
+                setParticipantsMap(prev => ({ ...prev, ...newPMap }));
+            });
+        }
+    }, [paginatedTransactions, participantsMap]);
+
 
     if (loading) {
         return (
@@ -314,7 +335,7 @@ const TransactionsPage: React.FC = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredTransactions.map(tx => {
+                                    paginatedTransactions.map(tx => {
                                         // Try to find the agent name locally from our fetched agents
                                         const txParticipants = participantsMap[tx.id] || [];
                                         const owner = txParticipants.find(p => p.owner);
@@ -379,6 +400,76 @@ const TransactionsPage: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination UI */}
+                    {totalPages > 1 && (
+                        <div className="px-6 py-4 flex items-center justify-between border-t border-white/5 bg-slate-800/20">
+                            <div className="flex-1 flex items-center justify-between sm:hidden">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-sm text-slate-400">
+                                        Showing <span className="font-medium text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-200">{Math.min(currentPage * itemsPerPage, filteredTransactions.length)}</span> of <span className="font-medium text-slate-200">{filteredTransactions.length}</span> results
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                        <button
+                                            onClick={() => setCurrentPage(1)}
+                                            disabled={currentPage === 1}
+                                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">First</span>
+                                            <ChevronsLeft size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            className="relative inline-flex items-center px-2 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">Previous</span>
+                                            <ChevronLeft size={16} />
+                                        </button>
+
+                                        <span className="relative inline-flex items-center px-4 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-200">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            className="relative inline-flex items-center px-2 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">Next</span>
+                                            <ChevronRight size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">Last</span>
+                                            <ChevronsRight size={16} />
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </DashboardLayout>

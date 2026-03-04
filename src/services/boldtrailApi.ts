@@ -56,7 +56,7 @@ class BoldTrailApi {
      * Note: The boldtrail transactions API limits to 1000 items per request max,
      * we will fetch up to max pages or as requested.
      */
-    async getTransactions(limit: number = 200): Promise<BoldTrailTransaction[]> {
+    async getTransactions(limit: number = 1000): Promise<BoldTrailTransaction[]> {
         const allTransactions: BoldTrailTransaction[] = [];
         let startingFromId: number | undefined = undefined;
         const batchSize = 1000;
