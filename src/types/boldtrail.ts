@@ -15,7 +15,7 @@ export interface BoldTrailTransaction {
     city: string;
     state: string;
     zip: string;
-    status: 'listing' | 'pending' | 'closed' | 'cancelled' | 'active' | 'opportunity';
+    status: 'listing' | 'pending' | 'closed' | 'cancelled' | 'active' | 'opportunity' | 'pre_listing';
     price: number;
     transaction_type: string;
     representing: 'seller' | 'buyer' | 'both';

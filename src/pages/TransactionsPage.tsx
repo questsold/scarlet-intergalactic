@@ -96,7 +96,7 @@ const TransactionsPage: React.FC = () => {
                     'Under Contract': 'pending',
                     'Closed': 'closed',
                     'Cancelled': 'cancelled',
-                    'Pre-Listing': 'active',
+                    'Pre-Listing': 'pre_listing',
                     'Opportunities': 'opportunity'
                 };
                 const allowedStatuses = statusFilter.map(sf => statusMap[sf]);
@@ -287,12 +287,14 @@ const TransactionsPage: React.FC = () => {
                                                     {tx.address || 'Unnamed Deal'}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset capitalize ${tx.status === 'listing' ? 'bg-blue-400/10 text-blue-400 ring-blue-400/20' :
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset capitalize whitespace-nowrap ${tx.status === 'listing' ? 'bg-blue-400/10 text-blue-400 ring-blue-400/20' :
                                                         tx.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20' :
                                                             tx.status === 'closed' ? 'bg-green-400/10 text-green-400 ring-green-400/20' :
-                                                                'bg-red-400/10 text-red-400 ring-red-400/20'
+                                                                tx.status === 'pre_listing' ? 'bg-purple-400/10 text-purple-400 ring-purple-400/20' :
+                                                                    tx.status === 'opportunity' ? 'bg-orange-400/10 text-orange-400 ring-orange-400/20' :
+                                                                        'bg-red-400/10 text-red-400 ring-red-400/20'
                                                         }`}>
-                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status}
+                                                        {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : tx.status === 'pre_listing' ? 'pre-listing' : tx.status}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-400 text-sm">
