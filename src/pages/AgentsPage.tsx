@@ -20,12 +20,40 @@ interface UserAccess {
     role: 'admin' | 'user';
 }
 
+interface BtProfile {
+    title?: string;
+    phone?: string;
+    anniversary_date?: number;
+    start_date?: number;
+}
+
+const formatDate = (ts?: number) => {
+    if (!ts) return 'N/A';
+    return new Date(ts > 9999999999 ? ts : ts * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const getTitleWeight = (title?: string) => {
+    if (!title) return 7;
+    const t = title.toLowerCase();
+    if (t.includes('broker') || t.includes('owner')) return 1;
+    if (t.includes('transaction coordinator') || t.includes('tc') || t === 'tc') return 2;
+    if (t.includes('success manager')) return 3;
+    if (t.includes('pc advisor') || t.includes('principal consultant')) return 4;
+    if (t.includes('exec')) return 5;
+    if (t.includes('senior')) return 6;
+    if (t.includes('advisor') || t.includes('agent')) return 7;
+    return 8;
+};
+
 const AgentsPage: React.FC = () => {
     const [authUser] = useAuthState(auth);
     const [loading, setLoading] = useState(true);
     const [fubAgents, setFubAgents] = useState<FubAgent[]>([]);
     const [accessMap, setAccessMap] = useState<Record<string, UserAccess>>({});
+    const [btProfiles, setBtProfiles] = useState<Record<string, BtProfile>>({});
     const [saving, setSaving] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [emailToBtIdMap, setEmailToBtIdMap] = useState<Record<string, number>>({});
 
     useEffect(() => {
         const fetchData = async () => {
@@ -59,11 +87,7 @@ const AgentsPage: React.FC = () => {
                         emailToBtId[u.email.toLowerCase()] = u.id;
                     }
                 });
-
-                // Find BT IDs that match our quest agents
-                // (We don't need the IDs for deep details anymore to avoid rate limits)
-                // Skip profile matching logic to protect API limits
-
+                setEmailToBtIdMap(emailToBtId);
 
             } catch (err) {
                 console.error("Error loading settings data:", err);
@@ -73,6 +97,42 @@ const AgentsPage: React.FC = () => {
         };
         fetchData();
     }, []);
+
+    const syncAgentData = async () => {
+        setIsSyncing(true);
+        try {
+            const btIdsToFetch: number[] = [];
+            const agentEmails = fubAgents.map(a => a.email?.toLowerCase()).filter(Boolean) as string[];
+
+            agentEmails.forEach(email => {
+                if (emailToBtIdMap[email]) {
+                    btIdsToFetch.push(emailToBtIdMap[email]);
+                }
+            });
+
+            if (btIdsToFetch.length > 0) {
+                const profiles = await boldtrailApi.getUserDetails(btIdsToFetch);
+                const profileMapByEmail: Record<string, BtProfile> = {};
+
+                Object.values(profiles).forEach((profile: any) => {
+                    if (profile && profile.email) {
+                        profileMapByEmail[profile.email.toLowerCase()] = {
+                            title: profile.title,
+                            phone: profile.phone,
+                            anniversary_date: profile.anniversary_date,
+                            start_date: profile.start_date
+                        };
+                    }
+                });
+                setBtProfiles(profileMapByEmail);
+            }
+        } catch (err) {
+            console.error("Error syncing agent data:", err);
+            alert("Failed to sync data from BoldTrail.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const toggleAccess = async (agentName: string, email: string) => {
         if (!email) {
@@ -162,13 +222,48 @@ const AgentsPage: React.FC = () => {
     return (
         <DashboardLayout>
             <div className="w-full max-w-6xl mx-auto animate-in fade-in duration-500 pb-12">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-100">Agents Directory</h1>
-                    <p className="text-slate-400 mt-2">Manage all agents, their dashboard access, and sync BackOffice data.</p>
+                <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-100">Agents Directory</h1>
+                        <p className="text-slate-400 mt-2">Manage all agents, their dashboard access, and sync BackOffice data.</p>
+                    </div>
+                    <button
+                        onClick={syncAgentData}
+                        disabled={isSyncing}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed h-11"
+                    >
+                        {isSyncing ? (
+                            <><Loader2 size={18} className="animate-spin" /> Syncing...</>
+                        ) : (
+                            <><ShieldCheck size={18} /> Sync BackOffice Data</>
+                        )}
+                    </button>
                 </div>
 
                 {(() => {
-                    const sortedAgents = [...fubAgents].sort((a, b) => a.name.localeCompare(b.name));
+                    const hasProfiles = Object.keys(btProfiles).length > 0;
+
+                    const adminAgents = fubAgents.filter(a => {
+                        const emailKey = a.email?.toLowerCase();
+                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                        // Default to advisors group if no profiles loaded yet
+                        if (!hasProfiles) return false;
+                        return getTitleWeight(title) <= 3;
+                    }).sort((a, b) => {
+                        const titleA = a.email ? btProfiles[a.email.toLowerCase()]?.title : undefined;
+                        const titleB = b.email ? btProfiles[b.email.toLowerCase()]?.title : undefined;
+                        const wA = getTitleWeight(titleA);
+                        const wB = getTitleWeight(titleB);
+                        if (wA !== wB) return wA - wB;
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    const regularAgents = fubAgents.filter(a => {
+                        const emailKey = a.email?.toLowerCase();
+                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
+                        if (!hasProfiles) return true;
+                        return getTitleWeight(title) > 3;
+                    }).sort((a, b) => a.name.localeCompare(b.name));
 
                     const renderTableSection = (title: string, agents: FubAgent[], description: string) => {
                         if (agents.length === 0) return null;
@@ -193,7 +288,10 @@ const AgentsPage: React.FC = () => {
                                         <thead>
                                             <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                                                 <th className="px-6 py-4">Agent Name</th>
-                                                <th className="px-6 py-4">Email</th>
+                                                <th className="px-6 py-4">Title</th>
+                                                <th className="px-6 py-4">Email & Phone</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
                                                 <th className="px-6 py-4 text-right">Dashboard Access</th>
                                             </tr>
                                         </thead>
@@ -209,8 +307,20 @@ const AgentsPage: React.FC = () => {
                                                         <td className="px-6 py-4 font-medium text-slate-200">
                                                             {agent.name}
                                                         </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm">
+                                                            {emailKey && btProfiles[emailKey]?.title || <span className="text-slate-600 italic">Advisor</span>}
+                                                        </td>
                                                         <td className="px-6 py-4">
-                                                            <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
+                                                                {emailKey && btProfiles[emailKey]?.phone && <span className="text-slate-500 text-xs mt-0.5">{btProfiles[emailKey].phone}</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                            {emailKey && btProfiles[emailKey] ? formatDate(btProfiles[emailKey].start_date) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                            {emailKey && btProfiles[emailKey] ? formatDate(btProfiles[emailKey].anniversary_date) : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {agent.email ? (
@@ -260,7 +370,8 @@ const AgentsPage: React.FC = () => {
 
                     return (
                         <>
-                            {renderTableSection("Agent Directory", sortedAgents, "All synchronized agents from Follow Up Boss and BoldTrail BackOffice.")}
+                            {renderTableSection("Leadership & Support", adminAgents, "Brokers, Transaction Coordinators, and Agent Success Managers.")}
+                            {renderTableSection("Advisors", regularAgents, "Real Estate Advisors synchronized from Follow Up Boss and BoldTrail BackOffice.")}
                             {fubAgents.length === 0 && (
                                 <div className="p-8 text-center text-slate-500">No agents found from FUB API matching @questsold.com.</div>
                             )}
