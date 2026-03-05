@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle, Home } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
 import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
 import { MultiSelect } from '../components/MultiSelect';
+import { useNavigate } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../services/firebase';
+import { clientPortalService } from '../services/clientPortalService';
 
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
-    const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
+    const [agents, setAgents] = useState<{ id: number; name: string; email?: string; avatarUrl?: string }[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -22,6 +26,13 @@ const TransactionsPage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 100;
 
+    const navigate = useNavigate();
+    const [authUser] = useAuthState(auth);
+    const [portalModalOpen, setPortalModalOpen] = useState(false);
+    const [selectedTxForPortal, setSelectedTxForPortal] = useState<BoldTrailTransaction | null>(null);
+    const [portalClientName, setPortalClientName] = useState('');
+    const [creatingPortal, setCreatingPortal] = useState(false);
+
     // Sort logic
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
 
@@ -31,6 +42,29 @@ const TransactionsPage: React.FC = () => {
             direction = 'desc';
         }
         setSortConfig({ key, direction });
+    };
+
+    const handleCreatePortal = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedTxForPortal || !portalClientName.trim() || !authUser?.email) return;
+
+        setCreatingPortal(true);
+        try {
+            const portalId = await clientPortalService.createPortalFromTransaction(
+                selectedTxForPortal,
+                portalClientName.trim(),
+                authUser.email
+            );
+            setPortalModalOpen(false);
+            setPortalClientName('');
+            setSelectedTxForPortal(null);
+            navigate(`/portals/${portalId}`);
+        } catch (error) {
+            console.error("Error creating portal:", error);
+            alert("Failed to create portal.");
+        } finally {
+            setCreatingPortal(false);
+        }
     };
 
     useEffect(() => {
@@ -59,6 +93,10 @@ const TransactionsPage: React.FC = () => {
                         return true;
                     }
                     return false;
+                }).map(u => {
+                    const fubMatch = fubAgents.find((f: any) => f.email?.toLowerCase() === u.email?.toLowerCase());
+                    const avatarUrl = fubMatch?.picture?.["162x162"] || fubMatch?.picture?.["60x60"] || fubMatch?.picture?.original || undefined;
+                    return { id: u.id, name: u.name, email: u.email, avatarUrl };
                 });
 
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
@@ -274,8 +312,8 @@ const TransactionsPage: React.FC = () => {
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('status')}>
                                         <div className="flex items-center gap-1">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
-                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('agentName')}>
-                                        <div className="flex items-center gap-1">Agent {sortConfig.key === 'agentName' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors w-16" onClick={() => handleSort('agentName')}>
+                                        <div className="flex items-center justify-center gap-1">Agent {sortConfig.key === 'agentName' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('price')}>
                                         <div className="flex items-center gap-1">Price / Vol {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
@@ -286,7 +324,7 @@ const TransactionsPage: React.FC = () => {
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('closing_date')}>
                                         <div className="flex items-center gap-1">Closing {sortConfig.key === 'closing_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
-                                    <th className="px-6 py-4 text-right">BackOffice</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -302,6 +340,7 @@ const TransactionsPage: React.FC = () => {
                                         const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
                                         const foundAgent = agents.find(a => a.id === agentId);
                                         const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
+                                        const agentAvatar = foundAgent?.avatarUrl || '';
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
@@ -322,8 +361,16 @@ const TransactionsPage: React.FC = () => {
                                                         {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : isOppSeller ? 'pre-listing' : isOppBuyer ? 'opportunity' : tx.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm">
-                                                    {agentName}
+                                                <td className="px-6 py-4 text-slate-400">
+                                                    <div className="flex justify-center items-center h-full">
+                                                        {agentAvatar ? (
+                                                            <img src={agentAvatar} alt={agentName} title={agentName} className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center shrink-0 text-xs font-medium text-slate-300" title={agentName}>
+                                                                {agentName === 'Unknown Agent' ? <Home size={14} className="opacity-50" /> : agentName.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                                                     ${(tx.price || tx.sales_volume || 0).toLocaleString()}
@@ -334,7 +381,19 @@ const TransactionsPage: React.FC = () => {
                                                 <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
                                                     {tx.closing_date ? new Date(tx.closing_date > 9999999999 ? tx.closing_date : tx.closing_date * 1000).toLocaleDateString() : '-'}
                                                 </td>
-                                                <td className="px-6 py-4 flex justify-end">
+                                                <td className="px-6 py-4 flex justify-end items-center gap-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedTxForPortal(tx);
+                                                            setPortalModalOpen(true);
+                                                        }}
+                                                        className="p-1.5 rounded-md hover:bg-brand-green/20 text-brand-green transition-colors focus:ring-2 focus:ring-brand-green/50 flex items-center gap-1 text-sm bg-brand-green/10 border border-brand-green/20"
+                                                        title="Create Client Portal"
+                                                    >
+                                                        <PlusCircle size={14} />
+                                                        <span className="hidden xl:inline">Portal</span>
+                                                    </button>
                                                     <a
                                                         href={`https://my.brokermint.com/#/transactions/${tx.id}`}
                                                         target="_blank"
@@ -419,6 +478,72 @@ const TransactionsPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Create Portal Modal */}
+            {portalModalOpen && selectedTxForPortal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#1c2336] rounded-2xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-800/20">
+                            <h3 className="text-xl font-semibold text-white tracking-tight">Create Client Portal</h3>
+                            <button
+                                onClick={() => {
+                                    setPortalModalOpen(false);
+                                    setPortalClientName('');
+                                    setSelectedTxForPortal(null);
+                                }}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreatePortal} className="p-6 flex flex-col gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Property Address</label>
+                                <div className="text-white font-medium bg-white/5 p-3 rounded-lg border border-white/10">
+                                    {selectedTxForPortal.address || 'Unnamed Deal'}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Client Name <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={portalClientName}
+                                    onChange={(e) => setPortalClientName(e.target.value)}
+                                    placeholder="e.g. John & Jane Doe"
+                                    className="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+                                    autoFocus
+                                />
+                                <p className="text-xs text-slate-500 mt-2">This name will be displayed at the top of their portal.</p>
+                            </div>
+                            <div className="pt-2 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPortalModalOpen(false);
+                                        setPortalClientName('');
+                                        setSelectedTxForPortal(null);
+                                    }}
+                                    className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-slate-300 font-medium hover:bg-white/5 transition-colors"
+                                    disabled={creatingPortal}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={creatingPortal || !portalClientName.trim()}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-brand-green text-white font-bold tracking-wide hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/50 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                                >
+                                    {creatingPortal ? <Loader2 size={18} className="animate-spin" /> : <PlusCircle size={18} />}
+                                    Create Portal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 };
