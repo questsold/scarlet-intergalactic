@@ -20,37 +20,11 @@ interface UserAccess {
     role: 'admin' | 'user';
 }
 
-interface BtProfile {
-    title?: string;
-    phone?: string;
-    anniversary_date?: number;
-    start_date?: number;
-}
-
-const formatDate = (ts?: number) => {
-    if (!ts) return 'N/A';
-    return new Date(ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
-const getTitleWeight = (title?: string) => {
-    if (!title) return 7; // Default to 'Advisor' level if no title
-    const t = title.toLowerCase();
-    if (t.includes('broker') || t.includes('owner')) return 1;
-    if (t.includes('transaction coordinator') || t.includes('tc') || t === 'tc') return 2;
-    if (t.includes('success manager')) return 3;
-    if (t.includes('pc advisor') || t.includes('principal consultant')) return 4;
-    if (t.includes('exec')) return 5;
-    if (t.includes('senior')) return 6;
-    if (t.includes('advisor') || t.includes('agent')) return 7;
-    return 8; // fallback
-};
-
 const AgentsPage: React.FC = () => {
     const [authUser] = useAuthState(auth);
     const [loading, setLoading] = useState(true);
     const [fubAgents, setFubAgents] = useState<FubAgent[]>([]);
     const [accessMap, setAccessMap] = useState<Record<string, UserAccess>>({});
-    const [btProfiles, setBtProfiles] = useState<Record<string, BtProfile>>({});
     const [saving, setSaving] = useState<string | null>(null);
 
     useEffect(() => {
@@ -87,32 +61,9 @@ const AgentsPage: React.FC = () => {
                 });
 
                 // Find BT IDs that match our quest agents
-                const btIdsToFetch: number[] = [];
-                const questAgentEmails = questAgents.map(a => a.email?.toLowerCase()).filter(Boolean) as string[];
-                questAgentEmails.forEach(email => {
-                    if (emailToBtId[email]) {
-                        btIdsToFetch.push(emailToBtId[email]);
-                    }
-                });
+                // (We don't need the IDs for deep details anymore to avoid rate limits)
+                // Skip profile matching logic to protect API limits
 
-                // Fetch expanded profiles in parallel
-                if (btIdsToFetch.length > 0) {
-                    const profiles = await boldtrailApi.getUserDetails(btIdsToFetch);
-                    const profileMapByEmail: Record<string, BtProfile> = {};
-
-                    // The 'profiles' object is keyed by BT ID
-                    Object.values(profiles).forEach((profile: any) => {
-                        if (profile && profile.email) {
-                            profileMapByEmail[profile.email.toLowerCase()] = {
-                                title: profile.title,
-                                phone: profile.phone,
-                                anniversary_date: profile.anniversary_date,
-                                start_date: profile.start_date
-                            };
-                        }
-                    });
-                    setBtProfiles(profileMapByEmail);
-                }
 
             } catch (err) {
                 console.error("Error loading settings data:", err);
@@ -217,24 +168,7 @@ const AgentsPage: React.FC = () => {
                 </div>
 
                 {(() => {
-                    const adminAgents = fubAgents.filter(a => {
-                        const emailKey = a.email?.toLowerCase();
-                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
-                        return getTitleWeight(title) <= 3;
-                    }).sort((a, b) => {
-                        const titleA = a.email ? btProfiles[a.email.toLowerCase()]?.title : undefined;
-                        const titleB = b.email ? btProfiles[b.email.toLowerCase()]?.title : undefined;
-                        const wA = getTitleWeight(titleA);
-                        const wB = getTitleWeight(titleB);
-                        if (wA !== wB) return wA - wB;
-                        return a.name.localeCompare(b.name);
-                    });
-
-                    const regularAgents = fubAgents.filter(a => {
-                        const emailKey = a.email?.toLowerCase();
-                        const title = emailKey ? btProfiles[emailKey]?.title : undefined;
-                        return getTitleWeight(title) > 3;
-                    }).sort((a, b) => a.name.localeCompare(b.name));
+                    const sortedAgents = [...fubAgents].sort((a, b) => a.name.localeCompare(b.name));
 
                     const renderTableSection = (title: string, agents: FubAgent[], description: string) => {
                         if (agents.length === 0) return null;
@@ -259,10 +193,7 @@ const AgentsPage: React.FC = () => {
                                         <thead>
                                             <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                                                 <th className="px-6 py-4">Agent Name</th>
-                                                <th className="px-6 py-4">Title</th>
-                                                <th className="px-6 py-4">Email & Phone</th>
-                                                <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
-                                                <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
+                                                <th className="px-6 py-4">Email</th>
                                                 <th className="px-6 py-4 text-right">Dashboard Access</th>
                                             </tr>
                                         </thead>
@@ -272,27 +203,14 @@ const AgentsPage: React.FC = () => {
                                                 const dbAccess = emailKey ? accessMap[emailKey] : null;
                                                 const hasAccess = dbAccess?.hasAccess || false;
                                                 const isSaving = saving === emailKey;
-                                                const profile = emailKey ? btProfiles[emailKey] : null;
 
                                                 return (
                                                     <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-slate-200">
                                                             {agent.name}
                                                         </td>
-                                                        <td className="px-6 py-4 text-slate-400 text-sm">
-                                                            {profile?.title || <span className="text-slate-600 italic">Agent</span>}
-                                                        </td>
                                                         <td className="px-6 py-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
-                                                                {profile?.phone && <span className="text-slate-500 text-xs mt-0.5">{profile.phone}</span>}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                            {formatDate(profile?.start_date)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                            {formatDate(profile?.anniversary_date)}
+                                                            <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {agent.email ? (
@@ -342,8 +260,7 @@ const AgentsPage: React.FC = () => {
 
                     return (
                         <>
-                            {renderTableSection("Leadership & Support", adminAgents, "Brokers, Transaction Coordinators, and Agent Success Managers.")}
-                            {renderTableSection("Advisors", regularAgents, "Real Estate Advisors synchronized from Follow Up Boss and BoldTrail BackOffice.")}
+                            {renderTableSection("Agent Directory", sortedAgents, "All synchronized agents from Follow Up Boss and BoldTrail BackOffice.")}
                             {fubAgents.length === 0 && (
                                 <div className="p-8 text-center text-slate-500">No agents found from FUB API matching @questsold.com.</div>
                             )}
