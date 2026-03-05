@@ -1,6 +1,6 @@
 export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
 
-export const filterByTimeframe = <T extends { created?: string, createdAt?: string, created_at?: number, listing_date?: number, acceptance_date?: number }>(
+export const filterByTimeframe = <T extends { created?: string | null, createdAt?: string | null, created_at?: number | null, listing_date?: number | null, acceptance_date?: number | null }>(
     data: T[],
     timeframe: Timeframe,
     customStartDate?: string,
