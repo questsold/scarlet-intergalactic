@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
-import type { BoldTrailTransaction, BoldTrailUser } from '../types/boldtrail';
+import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
 import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
 import { MultiSelect } from '../components/MultiSelect';
@@ -11,7 +11,6 @@ const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
     const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
-    const [participantsMap, setParticipantsMap] = useState<Record<number, BoldTrailUser[]>>({});
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -20,10 +19,8 @@ const TransactionsPage: React.FC = () => {
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-    // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 100;
+    const pageSize = 100;
 
     // Sort logic
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
@@ -67,10 +64,9 @@ const TransactionsPage: React.FC = () => {
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
                 setAgents(validAgents);
 
-                // Fetch transactions
-                const txs = await boldtrailApi.getTransactions();
+                // Fetch transactions - limit to 1000 for performance/snappiness
+                const txs = await boldtrailApi.getTransactions(1000);
                 setTransactions(txs);
-                // No more fetching all participants here - we will fetch paged instead
             } catch (err) {
                 console.error("Error loading transactions:", err);
             } finally {
@@ -80,13 +76,13 @@ const TransactionsPage: React.FC = () => {
         fetchInitialData();
     }, []);
 
-    // Effect: Reset to Page 1 when search/filters change
+    // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate]);
+    }, [searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig]);
 
     const filteredTransactions = useMemo(() => {
-        let result = [...transactions]; // Copy to avoid mutation during sort
+        let result = transactions;
 
         // Apply timeframe filter based on created_at
         result = filterByTimeframe(result, timeframe, customStartDate, customEndDate);
@@ -121,18 +117,9 @@ const TransactionsPage: React.FC = () => {
 
             // Agent filter
             if (agentFilter.length > 0) {
-                const txParticipants = participantsMap[tx.id] || [];
-                const owner = txParticipants.find(p => p.owner);
-                if (owner && owner.email) {
-                    if (!agentFilter.includes(String(owner.id)) && !agentFilter.includes(owner.email.toLowerCase())) {
-                        return false;
-                    }
-                } else {
-                    // Fallback to representer IDs if no owner found
-                    const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
-                    const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
-                    if (!isBuyingAgent && !isListingAgent) return false;
-                }
+                const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
+                const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
+                if (!isBuyingAgent && !isListingAgent) return false;
             }
 
             return true;
@@ -145,66 +132,41 @@ const TransactionsPage: React.FC = () => {
                 let bValue: any = b[sortConfig.key as keyof typeof b];
 
                 if (sortConfig.key === 'agentName') {
-                    const txParticipantsA = participantsMap[a.id] || [];
-                    const ownerA = txParticipantsA.find(p => p.owner);
-                    if (ownerA && ownerA.email) {
-                        const matchedAgent = agents.find(ag => ag.email?.toLowerCase() === ownerA.email.toLowerCase());
-                        aValue = matchedAgent ? matchedAgent.name : ownerA.name;
-                    } else {
-                        const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
-                        const foundAgentA = agents.find(ag => ag.id === agentIdA);
-                        aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
-                    }
+                    const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
+                    const foundAgentA = agents.find(ag => ag.id === agentIdA);
+                    aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
 
-                    const txParticipantsB = participantsMap[b.id] || [];
-                    const ownerB = txParticipantsB.find(p => p.owner);
-                    if (ownerB && ownerB.email) {
-                        const matchedAgent = agents.find(ag => ag.email?.toLowerCase() === ownerB.email.toLowerCase());
-                        bValue = matchedAgent ? matchedAgent.name : ownerB.name;
-                    } else {
-                        const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
-                        const foundAgentB = agents.find(ag => ag.id === agentIdB);
-                        bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
-                    }
+                    const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
+                    const foundAgentB = agents.find(ag => ag.id === agentIdB);
+                    bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
                 } else if (sortConfig.key === 'price') {
                     aValue = a.price || a.sales_volume || 0;
                     bValue = b.price || b.sales_volume || 0;
                 } else {
+                    // fallbacks
                     aValue = aValue ?? '';
                     bValue = bValue ?? '';
                 }
 
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
                 return 0;
             });
         }
 
         return result;
-    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents, participantsMap]);
+    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents]);
 
-    // Derived pagination info
-    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
     const paginatedTransactions = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredTransactions.slice(start, start + itemsPerPage);
-    }, [filteredTransactions, currentPage]);
+        const startIndex = (currentPage - 1) * pageSize;
+        return filteredTransactions.slice(startIndex, startIndex + pageSize);
+    }, [filteredTransactions, currentPage, pageSize]);
 
-    // Effect: Fetch participants for the visible page
-    useEffect(() => {
-        if (paginatedTransactions.length === 0) return;
-
-        const missingIds = paginatedTransactions
-            .map(tx => tx.id)
-            .filter(id => !participantsMap[id]);
-
-        if (missingIds.length > 0) {
-            boldtrailApi.getTransactionParticipants(missingIds).then(newPMap => {
-                setParticipantsMap(prev => ({ ...prev, ...newPMap }));
-            });
-        }
-    }, [paginatedTransactions, participantsMap]);
-
+    const totalPages = Math.ceil(filteredTransactions.length / pageSize);
 
     if (loading) {
         return (
@@ -337,18 +299,9 @@ const TransactionsPage: React.FC = () => {
                                 ) : (
                                     paginatedTransactions.map(tx => {
                                         // Try to find the agent name locally from our fetched agents
-                                        const txParticipants = participantsMap[tx.id] || [];
-                                        const owner = txParticipants.find(p => p.owner);
-                                        let agentName = 'Unknown Agent';
-
-                                        if (owner && owner.email) {
-                                            const matchedAgent = agents.find(a => a.email?.toLowerCase() === owner.email.toLowerCase());
-                                            agentName = matchedAgent ? matchedAgent.name : owner.name;
-                                        } else {
-                                            const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
-                                            const foundAgent = agents.find(a => a.id === agentId);
-                                            agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
-                                        }
+                                        const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
+                                        const foundAgent = agents.find(a => a.id === agentId);
+                                        const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
@@ -401,72 +354,66 @@ const TransactionsPage: React.FC = () => {
                         </table>
                     </div>
 
-                    {/* Pagination UI */}
+                    {/* Pagination Controls */}
                     {totalPages > 1 && (
-                        <div className="px-6 py-4 flex items-center justify-between border-t border-white/5 bg-slate-800/20">
-                            <div className="flex-1 flex items-center justify-between sm:hidden">
+                        <div className="px-6 py-4 border-t border-white/5 bg-slate-800/20 flex items-center justify-between">
+                            <div className="text-sm text-slate-400">
+                                Showing <span className="text-slate-200">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-slate-200">{Math.min(currentPage * pageSize, filteredTransactions.length)}</span> of <span className="text-slate-200">{filteredTransactions.length}</span> results
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                     disabled={currentPage === 1}
-                                    className="relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-sm hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Previous
                                 </button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        // Simple logic to show a few pages
+                                        let pageNum = i + 1;
+                                        if (totalPages > 5 && currentPage > 3) {
+                                            pageNum = currentPage - 3 + i;
+                                        }
+                                        if (pageNum > totalPages) return null;
+
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all ${currentPage === pageNum
+                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                                    : 'text-slate-400 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                    {totalPages > 5 && currentPage < totalPages - 2 && (
+                                        <>
+                                            <span className="text-slate-600 px-1">...</span>
+                                            <button
+                                                onClick={() => setCurrentPage(totalPages)}
+                                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all ${currentPage === totalPages
+                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                                    : 'text-slate-400 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+
                                 <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                     disabled={currentPage === totalPages}
-                                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-sm hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Next
                                 </button>
-                            </div>
-                            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p className="text-sm text-slate-400">
-                                        Showing <span className="font-medium text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-200">{Math.min(currentPage * itemsPerPage, filteredTransactions.length)}</span> of <span className="font-medium text-slate-200">{filteredTransactions.length}</span> results
-                                    </p>
-                                </div>
-                                <div>
-                                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <button
-                                            onClick={() => setCurrentPage(1)}
-                                            disabled={currentPage === 1}
-                                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                        >
-                                            <span className="sr-only">First</span>
-                                            <ChevronsLeft size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            className="relative inline-flex items-center px-2 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                        >
-                                            <span className="sr-only">Previous</span>
-                                            <ChevronLeft size={16} />
-                                        </button>
-
-                                        <span className="relative inline-flex items-center px-4 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-200">
-                                            Page {currentPage} of {totalPages}
-                                        </span>
-
-                                        <button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            className="relative inline-flex items-center px-2 py-2 border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                        >
-                                            <span className="sr-only">Next</span>
-                                            <ChevronRight size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/10 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                        >
-                                            <span className="sr-only">Last</span>
-                                            <ChevronsRight size={16} />
-                                        </button>
-                                    </nav>
-                                </div>
                             </div>
                         </div>
                     )}
