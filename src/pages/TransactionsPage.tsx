@@ -157,7 +157,10 @@ const TransactionsPage: React.FC = () => {
             if (agentFilter.length > 0) {
                 const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
                 const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
-                if (!isBuyingAgent && !isListingAgent) return false;
+
+                if (!isBuyingAgent && !isListingAgent) {
+                    return false;
+                }
             }
 
             return true;
