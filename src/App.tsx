@@ -7,12 +7,10 @@ import { auth, db } from './services/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import AgentTable from './components/AgentTable';
 import TopProducers from './components/TopProducers';
-import { fetchAllPeople, fetchUsers, fetchAllDeals } from './services/fubApi';
+import { fetchAllPeople, fetchUsers } from './services/fubApi';
 import type { FubPerson, FubUser } from './types/fub';
-import type { FubDeal } from './types/fubDeals';
 import { boldtrailApi } from './services/boldtrailApi';
 import type { BoldTrailTransaction, BoldTrailUser } from './types/boldtrail';
-import type { UnifiedDeal } from './types/unifiedDeal';
 import { isConvertedStage, calculateConversionRate } from './utils/fubData';
 import { AgentProductionTable } from './components/AgentProductionTable';
 import type { AgentProductionData } from './components/AgentProductionTable';
@@ -27,7 +25,6 @@ function App() {
 
   const [people, setPeople] = useState<FubPerson[]>([]);
   const [users, setUsers] = useState<FubUser[]>([]);
-  const [deals, setDeals] = useState<FubDeal[]>([]);
   const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
   const [btUsers, setBtUsers] = useState<BoldTrailUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,16 +63,14 @@ function App() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [peopleResponse, usersResponse, dealsResponse, btTransactionsRes, btUsersRes] = await Promise.all([
+        const [peopleResponse, usersResponse, btTransactionsRes, btUsersRes] = await Promise.all([
           fetchAllPeople(),
           fetchUsers(),
-          fetchAllDeals(),
           boldtrailApi.getTransactions(),
           boldtrailApi.getUsers()
         ]);
         setPeople(peopleResponse.people || []);
         setUsers(usersResponse.users || []);
-        setDeals(dealsResponse.deals || []);
         setTransactions(btTransactionsRes || []);
         setBtUsers(btUsersRes || []);
         setError(null);
@@ -91,8 +86,6 @@ function App() {
 
   // --- Data Processing ---
   const filteredPeople = useMemo(() => filterByTimeframe(people, timeframe, customStartDate, customEndDate), [people, timeframe, customStartDate, customEndDate]);
-  // Note: deals are NOT pre-filtered by timeframe here — pending/closed counts use enteredStageAt-based filtering
-  // inside productionTableData and agentDealMap instead of createdAt-based filtering.
 
   const LOCAL_STORAGE_KEY = 'bt_tx_parts_v1';
   const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
@@ -106,83 +99,15 @@ function App() {
   useEffect(() => {
     if (transactions.length === 0) return;
 
-    const now = new Date();
-    let rangeStart: Date | null = null;
-    let rangeEnd: Date | null = null;
-    if (timeframe !== 'All Time') {
-      switch (timeframe) {
-        case 'This Week': {
-          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
-          rangeStart = d;
-          rangeEnd = new Date(d);
-          rangeEnd.setDate(rangeEnd.getDate() + 7);
-          break;
-        }
-        case 'This Month':
-          rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-          break;
-        case 'Last Month':
-          rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'This Quarter': {
-          const qm = Math.floor(now.getMonth() / 3) * 3;
-          rangeStart = new Date(now.getFullYear(), qm, 1);
-          rangeEnd = new Date(now.getFullYear(), qm + 3, 1);
-          break;
-        }
-        case 'This Year':
-          rangeStart = new Date(now.getFullYear(), 0, 1);
-          rangeEnd = new Date(now.getFullYear() + 1, 0, 1);
-          break;
-        case '2025':
-          rangeStart = new Date(2025, 0, 1); rangeEnd = new Date(2026, 0, 1); break;
-        case '2024':
-          rangeStart = new Date(2024, 0, 1); rangeEnd = new Date(2025, 0, 1); break;
-        case 'Custom':
-          if (customStartDate) rangeStart = new Date(customStartDate);
-          if (customEndDate) { const e = new Date(customEndDate); e.setDate(e.getDate() + 1); rangeEnd = e; }
-          break;
-      }
-    }
+    const needsParticipantIds = transactions.map(tx => tx.id).filter(id => !txParticipants[id]);
 
-    const inRange = (dateParam: string | number | undefined | null): boolean => {
-      if (!dateParam) return false;
-      const d = new Date(dateParam);
-      if (rangeStart && d < rangeStart) return false;
-      if (rangeEnd && d >= rangeEnd) return false;
-      return true;
-    };
-
-    const neededTxIds = new Set<number>();
-
-    transactions.forEach(tx => {
-      if (tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        neededTxIds.add(tx.id);
-      }
-      const contractDateStr = tx.acceptance_date || tx.created_at;
-      const isWritten = timeframe === 'All Time' || inRange(contractDateStr);
-      const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
-      if (isWritten && allowedWrittenStatuses.includes(tx.status)) {
-        neededTxIds.add(tx.id);
-      }
-      const closeDateStr = tx.closing_date;
-      if (tx.status === 'closed' && (timeframe === 'All Time' || inRange(closeDateStr))) {
-        neededTxIds.add(tx.id);
-      }
-    });
-
-    const missingIds = Array.from(neededTxIds).filter(id => !txParticipants[id]);
-
-    if (missingIds.length > 0) {
-      boldtrailApi.getTransactionParticipants(missingIds).then(res => {
+    if (needsParticipantIds.length > 0) {
+      boldtrailApi.getTransactionParticipants(needsParticipantIds).then(res => {
         setTxParticipants(prev => {
           const next = { ...prev };
           let changed = false;
           for (const [txIdStr, pUsers] of Object.entries(res)) {
-            if ((pUsers as any).error === 429) continue; // Rate limited, skip caching it
+            if ((pUsers as any).error === 429) continue;
             const txId = parseInt(txIdStr);
             const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
             const targets = owners.length > 0 ? owners : (pUsers as any[]);
@@ -197,11 +122,11 @@ function App() {
         });
       });
     }
-  }, [transactions, timeframe, customStartDate, customEndDate, txParticipants]);
+  }, [transactions, txParticipants]);
 
 
   const agentTableData = useMemo(() => {
-    if (filteredPeople.length === 0 || users.length === 0) return [];
+    if (users.length === 0) return [];
 
     const agentMap = new Map<number, { name: string, total: number, converted: number, avatarUrl?: string }>();
     users.forEach(user => {
@@ -238,22 +163,9 @@ function App() {
       .sort((a, b) => b.totalLeads - a.totalLeads);
   }, [filteredPeople, users]);
 
-  // --- Production Table Data Processing ---
-  // IMPORTANT: Closed and pending deals are counted by when the deal *entered that stage* (enteredStageAt),
-  // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
-  // but closed in February should count toward February's closed total.
   const { productionTableData, dashboardKpis } = useMemo(() => {
     if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], underContract: [], cancelled: [], closed: [] } };
 
-    // Determine if we should filter the global dashboard down to just the currently logged-in Agent
-    let authFubUserId: number | null = null;
-    if (!isAdmin && authUser && authUser.email) {
-      const authEmail = authUser.email.toLowerCase();
-      const me = users.find(u => u.email && u.email.toLowerCase() === authEmail);
-      if (me) authFubUserId = me.id;
-    }
-
-    // Build start/end date range from the current timeframe selection
     const now = new Date();
     let rangeStart: Date | null = null;
     let rangeEnd: Date | null = null;
@@ -298,7 +210,12 @@ function App() {
 
     const inRange = (dateParam: string | number | undefined | null): boolean => {
       if (!dateParam) return false;
-      const d = new Date(dateParam);
+
+      const dateNum = typeof dateParam === 'number' ?
+        (dateParam > 9999999999 ? dateParam : dateParam * 1000) :
+        dateParam;
+
+      const d = new Date(dateNum);
       if (rangeStart && d < rangeStart) return false;
       if (rangeEnd && d >= rangeEnd) return false;
       return true;
@@ -317,7 +234,6 @@ function App() {
       }
     });
 
-    // New leads: filtered by createdAt (when the lead came in)
     filteredPeople.forEach(person => {
       const agentId = person.assignedUserId;
       if (agentId && prodMap.has(agentId)) {
@@ -325,10 +241,10 @@ function App() {
       }
     });
 
-    const activeListings: UnifiedDeal[] = [];
-    const underContract: UnifiedDeal[] = [];
-    const cancelled: UnifiedDeal[] = [];
-    const closed: UnifiedDeal[] = [];
+    const activeListings: BoldTrailTransaction[] = [];
+    const underContract: BoldTrailTransaction[] = [];
+    const cancelled: BoldTrailTransaction[] = [];
+    const closed: BoldTrailTransaction[] = [];
 
     const btIdToNameMap = new Map<number, string>();
     const btIdToEmailMap = new Map<number, string>();
@@ -348,84 +264,95 @@ function App() {
       if (u.email) emailToFubUserId.set(u.email.toLowerCase(), u.id);
     });
 
+    let authFubUserId: number | null = null;
+    if (!isAdmin && authUser && authUser.email) {
+      const authEmail = authUser.email.toLowerCase();
+      const me = users.find(u => u.email && u.email.toLowerCase() === authEmail);
+      if (me) authFubUserId = me.id;
+    }
+
     transactions.forEach(tx => {
-      // Is this deal belonging to the logged in agent?
-      let belongsToAgent = false;
-      const _btAgentIds = txParticipants[tx.id] || [];
-      if (!authFubUserId) {
-        belongsToAgent = true; // Admin sees all
-      } else {
-        for (const btAgentId of _btAgentIds) {
-          const agentEmail = btIdToEmailMap.get(btAgentId);
-          const agentName = btIdToNameMap.get(btAgentId);
-          if (agentEmail && emailToFubUserId.get(agentEmail) === authFubUserId) { belongsToAgent = true; break; }
-          if (agentName && nameToFubUserId.get(agentName.toLowerCase()) === authFubUserId) { belongsToAgent = true; break; }
+      const btAgentIds = txParticipants[tx.id] || [];
+      let belongsToAgent = !authFubUserId;
+      if (authFubUserId) {
+        for (const btAgentId of btAgentIds) {
+          const email = btIdToEmailMap.get(btAgentId);
+          const name = btIdToNameMap.get(btAgentId);
+          if (email && emailToFubUserId.get(email) === authFubUserId) { belongsToAgent = true; break; }
+          if (name && nameToFubUserId.get(name.toLowerCase()) === authFubUserId) { belongsToAgent = true; break; }
         }
       }
 
-      // 1. Active Listings (from BoldTrail representing seller/both)
-      if (belongsToAgent && tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        activeListings.push(tx);
+      if (!belongsToAgent) return;
+
+      const listingDate = tx.listing_date || tx.created_at;
+      const acceptanceDate = tx.acceptance_date || tx.created_at;
+      const closingDate = tx.closing_date;
+
+      if (tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
+        if (timeframe === 'All Time' || inRange(listingDate)) {
+          activeListings.push(tx);
+        }
       }
 
-      const contractDateStr = tx.acceptance_date || tx.created_at;
-      const isWritten = timeframe === 'All Time' || inRange(contractDateStr);
+      if (['pending', 'closed', 'cancelled'].includes(tx.status)) {
+        if (timeframe === 'All Time' || inRange(acceptanceDate)) {
+          underContract.push(tx);
 
-      const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
-      const isValidWrittenStatus = allowedWrittenStatuses.includes(tx.status);
+          btAgentIds.forEach(btId => {
+            const email = btIdToEmailMap.get(btId);
+            const name = btIdToNameMap.get(btId);
+            let fId: number | undefined;
+            if (email) fId = emailToFubUserId.get(email);
+            if (!fId && name) fId = nameToFubUserId.get(name.toLowerCase());
 
-      const closeDateStr = tx.closing_date;
-      const isClosedState = tx.status === 'closed';
-      const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
+            if (fId && prodMap.has(fId)) {
+              prodMap.get(fId)!.writtenDeals += 1;
+            }
+          });
+        }
+      }
 
-      if (isWritten && isValidWrittenStatus) {
-        if (belongsToAgent) underContract.push(tx);
+      if (tx.status === 'closed') {
+        if (timeframe === 'All Time' || inRange(closingDate)) {
+          closed.push(tx);
+
+          btAgentIds.forEach(btId => {
+            const email = btIdToEmailMap.get(btId);
+            const name = btIdToNameMap.get(btId);
+            let fId: number | undefined;
+            if (email) fId = emailToFubUserId.get(email);
+            if (!fId && name) fId = nameToFubUserId.get(name.toLowerCase());
+
+            if (fId && prodMap.has(fId)) {
+              const prod = prodMap.get(fId)!;
+              prod.closedDeals += 1;
+              prod.volume += (tx.price || 0) / (btAgentIds.length || 1);
+            }
+          });
+        }
       }
 
       if (tx.status === 'cancelled') {
-        const cancelDateStr = tx.acceptance_date || tx.created_at;
-        if (timeframe === 'All Time' || inRange(cancelDateStr)) {
-          if (belongsToAgent) cancelled.push(tx);
+        if (timeframe === 'All Time' || inRange(acceptanceDate)) {
+          cancelled.push(tx);
         }
       }
 
-      if (isClosed) {
-        if (belongsToAgent) closed.push(tx);
-      }
+      // Assign agent avatar for KPI drilldowns
+      const firstBtId = btAgentIds[0];
+      if (firstBtId) {
+        const email = btIdToEmailMap.get(firstBtId);
+        const name = btIdToNameMap.get(firstBtId);
+        let fId: number | undefined;
+        if (email) fId = emailToFubUserId.get(email);
+        if (!fId && name) fId = nameToFubUserId.get(name.toLowerCase());
 
-      // Map agent production
-      const btAgentIds = txParticipants[tx.id] || [];
-      for (const btAgentId of btAgentIds) {
-        const agentName = btIdToNameMap.get(btAgentId);
-        const agentEmail = btIdToEmailMap.get(btAgentId);
-
-        if (agentName || agentEmail) {
-          let fubId: number | undefined;
-          if (agentEmail && emailToFubUserId.has(agentEmail)) {
-            fubId = emailToFubUserId.get(agentEmail);
-          } else if (agentName && nameToFubUserId.has(agentName.toLowerCase())) {
-            fubId = nameToFubUserId.get(agentName.toLowerCase());
-          }
-
-          if (fubId) {
-            const fubUser = users.find(u => u.id === fubId);
-            if (fubUser) {
-              const isOwner = fubUser.role === 'Owner';
-              if (!tx.assigned_agent_name || ((tx as any)._temp_assigned_is_owner && !isOwner)) {
-                tx.assigned_agent_name = agentName;
-                tx.assigned_agent_avatar = fubUser.picture?.["162x162"] || fubUser.picture?.["60x60"] || fubUser.picture?.original;
-                (tx as any)._temp_assigned_is_owner = isOwner;
-              }
-            }
-          }
-
-          if (fubId && prodMap.has(fubId)) {
-            const prod = prodMap.get(fubId)!;
-            if (isWritten && isValidWrittenStatus) prod.writtenDeals += 1;
-            if (isClosed) {
-              prod.closedDeals += 1;
-              prod.volume += (tx.price || 0) / btAgentIds.length;
-            }
+        if (fId) {
+          const u = users.find(user => user.id === fId);
+          if (u) {
+            tx.assigned_agent_name = u.name;
+            tx.assigned_agent_avatar = u.picture?.["162x162"] || u.picture?.["60x60"] || u.picture?.original;
           }
         }
       }
@@ -435,9 +362,8 @@ function App() {
       productionTableData: Array.from(prodMap.values()),
       dashboardKpis: { activeListings, underContract, cancelled, closed }
     };
-  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin]);
+  }, [filteredPeople, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin]);
 
-  // Format data for the TopProducers component
   const topProducersData = useMemo(() => {
     return [...productionTableData]
       .sort((a, b) => (b.closedDeals + b.writtenDeals) - (a.closedDeals + a.writtenDeals))
@@ -453,49 +379,32 @@ function App() {
       });
   }, [productionTableData, users]);
 
-  // --- Per-agent deal maps for drill-down navigation ---
   const agentDealMap = useMemo(() => {
-    const map = new Map<string, UnifiedDeal[]>();
+    const map = new Map<string, BoldTrailTransaction[]>();
     users.forEach(user => {
       if (user.status === 'Active' && (user.role === 'Owner' || user.role === 'Agent')) {
         map.set(user.name, []);
       }
     });
 
-    // 1. Prepare User Map
     const btIdToNameMap = new Map<number, string>();
     btUsers.forEach(u => {
       btIdToNameMap.set(u.id, u.name);
       btIdToNameMap.set(u.user_id, u.name);
     });
 
-    // 2. BoldTrail Active Listings
     transactions.forEach(tx => {
-      if (tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        const btAgentIds = txParticipants[tx.id] || [];
-        for (const btAgentId of btAgentIds) {
-          const agentName = btIdToNameMap.get(btAgentId);
-          if (agentName && map.has(agentName)) {
-            map.get(agentName)!.push(tx);
-          }
+      const ids = txParticipants[tx.id] || [];
+      ids.forEach(id => {
+        const name = btIdToNameMap.get(id);
+        if (name && map.has(name)) {
+          map.get(name)!.push(tx);
         }
-      }
-    });
-
-    // 3. BoldTrail Transactions (Pending, Closed, Cancelled)
-    transactions.forEach(tx => {
-      if (tx.status === 'listing') return; // Handled above for Active Listings
-      const btAgentIds = txParticipants[tx.id] || [];
-      for (const btAgentId of btAgentIds) {
-        const agentName = btIdToNameMap.get(btAgentId);
-        if (agentName && map.has(agentName)) {
-          map.get(agentName)!.push(tx);
-        }
-      }
+      });
     });
 
     return map;
-  }, [deals, transactions, btUsers, users, txParticipants]);
+  }, [transactions, btUsers, users, txParticipants]);
 
 
   const handleAgentClick = (agentName: string) => {
@@ -503,7 +412,7 @@ function App() {
       const authEmail = authUser?.email?.toLowerCase();
       const clickedUser = users.find(u => u.name === agentName);
       if (!authEmail || !clickedUser || clickedUser.email?.toLowerCase() !== authEmail) {
-        return; // Agents cannot click on other agents' profiles
+        return;
       }
     }
 
@@ -522,7 +431,7 @@ function App() {
     });
   };
 
-  const handleKpiClick = (title: string, kpiDeals: UnifiedDeal[]) => {
+  const handleKpiClick = (title: string, kpiDeals: BoldTrailTransaction[]) => {
     navigate(`/kpi-deals`, {
       state: {
         title,
@@ -535,7 +444,6 @@ function App() {
     });
   };
 
-  // --- Rendering ---
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f1322] flex items-center justify-center">
@@ -575,53 +483,29 @@ function App() {
 
   return (
     <DashboardLayout headerActions={headerFilterUI}>
-      {/* TOP ROW: KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in fade-in duration-500 mb-6">
-        <div
-          onClick={() => handleKpiClick("Active Listings", dashboardKpis.activeListings)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
-        >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Active Listings</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Total current listings</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-white tracking-tight">{dashboardKpis.activeListings.length}</span>
+        {[
+          { title: "Active Listings", count: dashboardKpis.activeListings.length, sub: "Total current", color: "text-white", kpi: dashboardKpis.activeListings },
+          { title: "Under Contract", count: dashboardKpis.underContract.length, sub: "Total in timeframe", color: "text-brand-green", kpi: dashboardKpis.underContract },
+          { title: "Cancelled", count: dashboardKpis.cancelled.length, sub: "Fell through", color: "text-red-400", kpi: dashboardKpis.cancelled },
+          { title: "Closed", count: dashboardKpis.closed.length, sub: "Closed in timeframe", color: "text-green-400", kpi: dashboardKpis.closed }
+        ].map((kpi, idx) => (
+          <div
+            key={idx}
+            onClick={() => handleKpiClick(kpi.title, kpi.kpi)}
+            className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
+          >
+            <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">{kpi.title}</h3>
+            <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">{kpi.sub}</p>
+            <div className="flex-1 flex items-center justify-start w-full pt-4">
+              <span className={`text-5xl font-bold ${kpi.color} tracking-tight`}>{kpi.count}</span>
+            </div>
           </div>
-        </div>
-        <div
-          onClick={() => handleKpiClick("Under Contract", dashboardKpis.underContract)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
-        >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Under Contract</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Total in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-brand-green tracking-tight">{dashboardKpis.underContract.length}</span>
-          </div>
-        </div>
-        <div
-          onClick={() => handleKpiClick("Cancelled Deals", dashboardKpis.cancelled)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
-        >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Cancelled</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Fell through in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-red-400 tracking-tight">{dashboardKpis.cancelled.length}</span>
-          </div>
-        </div>
-        <div
-          onClick={() => handleKpiClick("Closed Deals", dashboardKpis.closed)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
-        >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Closed</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Closed in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-green-400 tracking-tight">{dashboardKpis.closed.length}</span>
-          </div>
-        </div>
+        ))}
       </div>
 
       {authUser?.email === 'ali@questsold.com' && <CashFlowPredictor transactions={transactions} />}
 
-      {/* MIDDLE ROW: Leaderboards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full animate-in fade-in duration-500 delay-100">
         <div className="flex flex-col min-w-0">
           <AgentTable data={agentTableData.slice(0, 10)} onAgentClick={handleAgentClick} />
@@ -631,13 +515,11 @@ function App() {
         </div>
       </div>
 
-      {/* BOTTOM SECTION (Full Width: Agent Production) */}
-      {isAdmin && (
+      {isAdmin && productionTableData.length > 0 && (
         <div className="w-full mt-6 animate-in fade-in duration-500 delay-200">
           <AgentProductionTable data={productionTableData} onAgentClick={handleAgentClick} />
         </div>
       )}
-
     </DashboardLayout>
   );
 }
