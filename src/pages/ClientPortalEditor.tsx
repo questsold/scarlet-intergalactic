@@ -223,12 +223,23 @@ const ClientPortalEditor: React.FC = () => {
                     </button>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <button
-                            onClick={handleOpenBTModal}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg font-medium hover:bg-indigo-500/20 transition-all"
-                        >
-                            <Briefcase size={18} /> {portal.transactionId && !portal.transactionId.toString().startsWith('manual_') ? 'Re-Connect BT' : 'Connect BoldTrail'}
-                        </button>
+                        {portal.transactionId && !portal.transactionId.toString().startsWith('manual_') ? (
+                            <a
+                                href={`https://my.brokermint.com/#/transactions/${portal.transactionId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg font-medium hover:bg-indigo-500/20 transition-all"
+                            >
+                                <Briefcase size={18} /> Access Backoffice
+                            </a>
+                        ) : (
+                            <button
+                                onClick={handleOpenBTModal}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg font-medium hover:bg-indigo-500/20 transition-all"
+                            >
+                                <Briefcase size={18} /> Connect BoldTrail
+                            </button>
+                        )}
                         <button
                             onClick={handleSendInvite}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg font-medium hover:bg-blue-500/20 transition-all"
