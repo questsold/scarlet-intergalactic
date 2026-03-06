@@ -17,6 +17,8 @@ export interface ClientPortal {
     clientType?: 'buyer' | 'seller';
     propertyAddress: string;
     agentId: string; // To restrict access horizontally
+    agentName?: string;
+    agentPhotoUrl?: string;
     createdAt: number;
     updatedAt: number;
     milestones: ClientPortalMilestone[];

@@ -14,7 +14,6 @@ const ClientPortalsPage: React.FC = () => {
     const [authUser] = useAuthState(auth);
     const [portals, setPortals] = useState<ClientPortal[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false);
     const navigate = useNavigate();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,6 +23,8 @@ const ClientPortalsPage: React.FC = () => {
     const [selectedClientName, setSelectedClientName] = useState('');
     const [selectedClientCreated, setSelectedClientCreated] = useState<number | undefined>(undefined);
     const [selectedAgentEmail, setSelectedAgentEmail] = useState<string | null>(null);
+    const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
+    const [selectedAgentPhotoUrl, setSelectedAgentPhotoUrl] = useState<string | null>(null);
     const [selectedClientEmail, setSelectedClientEmail] = useState<string | undefined>(undefined);
     const [selectedClientPhone, setSelectedClientPhone] = useState<string | undefined>(undefined);
 
@@ -95,6 +96,8 @@ const ClientPortalsPage: React.FC = () => {
         try {
             const finalAddress = needsAddress ? propertyAddress : 'Buyer Search';
             const portalAgent = selectedAgentEmail || authUser.email;
+            const portalAgentName = selectedAgentName || authUser.displayName || undefined;
+            const portalAgentPhotoUrl = selectedAgentPhotoUrl || authUser.photoURL || undefined;
 
             const newPortalId = await clientPortalService.createManualPortal(
                 selectedClientName,
@@ -103,7 +106,9 @@ const ClientPortalsPage: React.FC = () => {
                 selectedClientCreated,
                 selectedClientEmail,
                 selectedClientPhone,
-                clientType as 'buyer' | 'seller'
+                clientType as 'buyer' | 'seller',
+                portalAgentName,
+                portalAgentPhotoUrl
             );
             setIsModalOpen(false);
             setClientType('');
@@ -130,7 +135,6 @@ const ClientPortalsPage: React.FC = () => {
                     const isFounder = authUser.email?.toLowerCase() === 'ali@questsold.com' || authUser.email?.toLowerCase() === 'admin@questsold.com';
                     adminStatus = isFounder;
                 }
-                setIsAdmin(adminStatus);
 
                 let fetchedPortals: ClientPortal[] = [];
                 if (adminStatus) {
@@ -241,14 +245,23 @@ const ClientPortalsPage: React.FC = () => {
                                                 {portal.milestones.filter(m => m.isCompleted).length} / {portal.milestones.length}
                                             </span>
                                         </div>
-                                        {isAdmin && (
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-slate-500">Agent:</span>
-                                                <span className="text-slate-300 truncate max-w-[150px]" title={portal.agentId}>
-                                                    {portal.agentId}
+                                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                                            <span className="text-slate-500 text-sm">Agent:</span>
+                                            <div className="flex items-center gap-2">
+                                                {portal.agentPhotoUrl ? (
+                                                    <img src={portal.agentPhotoUrl} alt="Agent" className="w-6 h-6 rounded-full object-cover border border-white/10" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-brand-green/20 text-brand-green border border-brand-green/30 text-[10px] font-bold cursor-default">
+                                                        {portal.agentName
+                                                            ? portal.agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                                            : portal.agentId ? portal.agentId[0].toUpperCase() : '?'}
+                                                    </div>
+                                                )}
+                                                <span className="text-slate-300 text-sm font-medium truncate max-w-[120px]" title={portal.agentName || portal.agentId}>
+                                                    {portal.agentName || portal.agentId.split('@')[0]}
                                                 </span>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
 
                                     <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-brand-green group-hover:text-brand-green/80 transition-colors">
@@ -304,6 +317,8 @@ const ClientPortalsPage: React.FC = () => {
                                                         setSelectedClientName(person.name);
                                                         setSelectedClientCreated(person.created ? new Date(person.created).getTime() : undefined);
                                                         setSelectedAgentEmail(person.assignedUserEmail || null);
+                                                        setSelectedAgentName(person.assignedUserName || null);
+                                                        setSelectedAgentPhotoUrl(person.assignedUserPicture || null);
                                                         setSelectedClientEmail(person.emails?.[0]?.value);
                                                         setSelectedClientPhone(person.phones?.[0]?.value);
                                                     }}
@@ -339,6 +354,8 @@ const ClientPortalsPage: React.FC = () => {
                                                 setSelectedClientName('');
                                                 setSelectedClientCreated(undefined);
                                                 setSelectedAgentEmail(null);
+                                                setSelectedAgentName(null);
+                                                setSelectedAgentPhotoUrl(null);
                                                 setSelectedClientEmail(undefined);
                                                 setSelectedClientPhone(undefined);
                                                 setSearchQuery('');

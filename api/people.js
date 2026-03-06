@@ -49,15 +49,24 @@ export default async function handler(req, res) {
             const usersData = await usersResponse.json();
             const userMap = {};
             (usersData.users || []).forEach(user => {
-                userMap[user.id] = user.email;
+                userMap[user.id] = {
+                    email: user.email,
+                    name: user.name,
+                    picture: user.picture
+                };
             });
 
-            // Annotate people with their assigned user's email
+            // Annotate people with their assigned user details
             if (data.people) {
-                data.people = data.people.map(person => ({
-                    ...person,
-                    assignedUserEmail: userMap[person.assignedUserId] || null
-                }));
+                data.people = data.people.map(person => {
+                    const assignedUser = userMap[person.assignedUserId];
+                    return {
+                        ...person,
+                        assignedUserEmail: assignedUser ? assignedUser.email : null,
+                        assignedUserName: assignedUser ? assignedUser.name : null,
+                        assignedUserPicture: assignedUser ? assignedUser.picture : null
+                    };
+                });
             }
         }
 

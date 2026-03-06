@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, UserCircle, FileSpreadsheet, Clock } from 'lucide-react';
+import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, FileSpreadsheet, Clock } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../services/firebase';
 
@@ -89,12 +89,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
                         )}
 
                         {authUser && (
-                            <div className="flex items-center" title={`Logged in as ${authUser.email}`}>
+                            <div className="flex items-center" title={`Logged in as ${authUser.displayName || authUser.email}`}>
                                 {authUser.photoURL ? (
-                                    <img src={authUser.photoURL} alt="Profile" className="w-8 h-8 rounded-full ml-2 border border-white/10" />
+                                    <img src={authUser.photoURL} alt="Profile" className="w-8 h-8 rounded-full ml-2 border border-white/10 object-cover" />
                                 ) : (
-                                    <div className="ml-2 bg-slate-800/50 p-1.5 rounded-full text-slate-400 hover:text-slate-200 transition-colors border border-white/5 cursor-default">
-                                        <UserCircle size={20} />
+                                    <div className="ml-2 bg-brand-green/20 text-brand-green w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border border-brand-green/30 cursor-default">
+                                        {authUser.displayName
+                                            ? authUser.displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                            : authUser.email ? authUser.email[0].toUpperCase() : '?'}
                                     </div>
                                 )}
                             </div>

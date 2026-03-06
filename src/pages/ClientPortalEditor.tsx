@@ -14,7 +14,8 @@ import {
     User as UserIcon,
     AlertCircle,
     Mail,
-    Phone
+    Phone,
+    Send
 } from 'lucide-react';
 import { clientPortalService } from '../services/clientPortalService';
 import type { ClientPortal } from '../types/clientPortal';
@@ -103,6 +104,15 @@ const ClientPortalEditor: React.FC = () => {
         window.open(`/portal/${id}`, '_blank');
     };
 
+    const handleSendInvite = () => {
+        if (!portal) return;
+        const link = `${window.location.origin}/portal/${portal.id}`;
+        const subject = encodeURIComponent(`Your QuestSold ${portal.clientType === 'seller' ? 'Seller' : 'Buyer'} Timeline`);
+        const body = encodeURIComponent(`Hi ${portal.clientName},\n\nHere is the link to your interactive timeline:\n${link}\n\nYou can visit this link anytime to check on your progress and see what's coming next!\n\nBest,\n${portal.agentName || 'Your Agent'}`);
+        const to = portal.clientEmail ? encodeURIComponent(portal.clientEmail) : '';
+        window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -149,6 +159,12 @@ const ClientPortalEditor: React.FC = () => {
                     </button>
 
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleSendInvite}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg font-medium hover:bg-blue-500/20 transition-all"
+                        >
+                            <Send size={18} /> Send Invite
+                        </button>
                         <button
                             onClick={copyLink}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${copied ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'}`}

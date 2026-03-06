@@ -228,7 +228,9 @@ export const clientPortalService = {
         questStartDate?: number,
         clientEmail?: string,
         clientPhone?: string,
-        clientType?: 'buyer' | 'seller'
+        clientType?: 'buyer' | 'seller',
+        agentName?: string,
+        agentPhotoUrl?: string
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
@@ -258,6 +260,8 @@ export const clientPortalService = {
             clientType: clientType || 'buyer',
             propertyAddress: propertyAddress || 'TBD Address',
             agentId: agentEmail.toLowerCase(),
+            agentName: agentName,
+            agentPhotoUrl: agentPhotoUrl,
             createdAt: now,
             updatedAt: now,
             milestones: milestones

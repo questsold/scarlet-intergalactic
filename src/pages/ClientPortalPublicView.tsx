@@ -86,9 +86,22 @@ const ClientPortalPublicView: React.FC = () => {
                     transition={{ duration: 0.8, ease: "easeOut" }}
                     className="text-center mb-16 space-y-6"
                 >
-                    <div className="inline-flex items-center justify-center p-4 bg-brand-green/10 rounded-full border border-brand-green/20 text-brand-green mb-2 shadow-lg shadow-brand-green/5">
-                        <Home size={32} />
-                    </div>
+                    {portal.agentPhotoUrl ? (
+                        <div className="inline-flex items-center justify-center p-1 bg-brand-green/20 rounded-full mb-2 shadow-2xl shadow-brand-green/10 border-2 border-brand-green/30">
+                            <img src={portal.agentPhotoUrl} alt="Your Agent" className="w-24 h-24 rounded-full object-cover border border-white/10" />
+                        </div>
+                    ) : (
+                        <div className="inline-flex items-center justify-center w-24 h-24 bg-brand-green/10 rounded-full border-2 border-brand-green/20 text-brand-green mb-2 shadow-lg shadow-brand-green/5 text-3xl font-bold">
+                            {portal.agentName
+                                ? portal.agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                : portal.agentId ? portal.agentId[0].toUpperCase() : <Home size={40} />}
+                        </div>
+                    )}
+                    {(portal.agentName || portal.agentId) && (
+                        <div className="text-slate-400 text-sm font-medium mb-6 mt-2 uppercase tracking-widest">
+                            Your Agent: <span className="text-white">{portal.agentName || portal.agentId.split('@')[0]}</span>
+                        </div>
+                    )}
                     <div>
                         <div className="text-brand-green font-semibold uppercase tracking-[0.2em] text-sm mb-3">
                             {portal.clientType === 'seller' ? 'Seller Timeline' : 'Buyer Timeline'}
