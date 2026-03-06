@@ -336,20 +336,32 @@ const ClientPortalsPage: React.FC = () => {
 
                                         {showAddressDropdown && addressResults.length > 0 && (
                                             <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                                                {addressResults.map((addr, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => {
-                                                            setPropertyAddress(addr.display_name.split(',').slice(0, 3).join(',').trim());
-                                                            setShowAddressDropdown(false);
-                                                            setAddressResults([]);
-                                                        }}
-                                                        className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
-                                                    >
-                                                        <MapPin size={14} className="shrink-0 text-brand-green" />
-                                                        <span className="truncate">{addr.display_name.split(',').slice(0, 3).join(',')}</span>
-                                                    </button>
-                                                ))}
+                                                {addressResults.map((addr, idx) => {
+                                                    let formattedAddress = addr.display_name;
+                                                    if (addr.address) {
+                                                        const a = addr.address;
+                                                        const street = [a.house_number, a.road].filter(Boolean).join(' ');
+                                                        const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
+                                                        const stateZip = [a.state, a.postcode].filter(Boolean).join(' ');
+                                                        const parts = [street, city, stateZip].filter(Boolean);
+                                                        if (parts.length > 0) formattedAddress = parts.join(', ');
+                                                    }
+
+                                                    return (
+                                                        <button
+                                                            key={idx}
+                                                            onClick={() => {
+                                                                setPropertyAddress(formattedAddress);
+                                                                setShowAddressDropdown(false);
+                                                                setAddressResults([]);
+                                                            }}
+                                                            className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <MapPin size={14} className="shrink-0 text-brand-green" />
+                                                            <span className="truncate">{formattedAddress}</span>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
