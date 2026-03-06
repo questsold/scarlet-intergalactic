@@ -9,7 +9,102 @@ export const clientPortalService = {
     /**
      * Generates default milestones for a standard transaction process.
      */
-    generateDefaultMilestones(transaction?: BoldTrailTransaction): ClientPortalMilestone[] {
+    generateDefaultMilestones(transaction?: BoldTrailTransaction, clientType: 'buyer' | 'seller' = 'buyer'): ClientPortalMilestone[] {
+        if (clientType === 'seller') {
+            return [
+                {
+                    id: 'preparing_home',
+                    title: 'Preparing home to list',
+                    description: 'Getting your home ready for the market',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 1
+                },
+                {
+                    id: 'listing_agreement',
+                    title: 'Listing agreement signed',
+                    description: 'Official paperwork to list your home',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 2
+                },
+                {
+                    id: 'listing_photos',
+                    title: 'Listing Photos',
+                    description: 'Professional photography session',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 3
+                },
+                {
+                    id: 'live_on_mls',
+                    title: 'Live on the MLS',
+                    description: 'Your home is officially on the market!',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 4
+                },
+                {
+                    id: 'offer_accepted_seller',
+                    title: 'Offer Accepted',
+                    description: 'You accepted an offer on your home!',
+                    deadlineDate: transaction?.acceptance_date || transaction?.created_at || null,
+                    completedDate: transaction?.acceptance_date || transaction?.created_at || null,
+                    isCompleted: !!transaction,
+                    order: 5
+                },
+                {
+                    id: 'inspection_due_diligence_seller',
+                    title: 'Inspection & Due Diligence',
+                    description: 'Buyer deadline for property inspections',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 6
+                },
+                {
+                    id: 'appraisal_seller',
+                    title: 'Appraisal',
+                    description: 'Lender appraisal of your property value',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 7
+                },
+                {
+                    id: 'clear_to_close_seller',
+                    title: 'Clear to Close',
+                    description: 'Final loan approval from the underwriter',
+                    deadlineDate: null,
+                    completedDate: null,
+                    isCompleted: false,
+                    order: 8
+                },
+                {
+                    id: 'closing_scheduled_seller',
+                    title: 'Closing Scheduled',
+                    description: 'Signing the final paperwork',
+                    deadlineDate: transaction?.closing_date || null,
+                    completedDate: null,
+                    isCompleted: transaction?.status === 'closed',
+                    order: 9
+                },
+                {
+                    id: 'key_exchange_seller',
+                    title: 'Key Exchange',
+                    description: 'Handing over the keys to the new owners!',
+                    deadlineDate: transaction?.closing_date || null,
+                    completedDate: null,
+                    isCompleted: transaction?.status === 'closed',
+                    order: 10
+                }
+            ];
+        }
+
         const milestones: ClientPortalMilestone[] = [
             {
                 id: 'viewing_homes',
@@ -132,12 +227,13 @@ export const clientPortalService = {
         agentEmail: string,
         questStartDate?: number,
         clientEmail?: string,
-        clientPhone?: string
+        clientPhone?: string,
+        clientType?: 'buyer' | 'seller'
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
 
-        const milestones = this.generateDefaultMilestones();
+        const milestones = this.generateDefaultMilestones(undefined, clientType);
         if (questStartDate) {
             // Shift all other milestones up by 1 order
             milestones.forEach(m => m.order += 1);
@@ -159,6 +255,7 @@ export const clientPortalService = {
             clientName: clientName,
             clientEmail: clientEmail,
             clientPhone: clientPhone,
+            clientType: clientType || 'buyer',
             propertyAddress: propertyAddress || 'TBD Address',
             agentId: agentEmail.toLowerCase(),
             createdAt: now,

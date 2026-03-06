@@ -102,7 +102,8 @@ const ClientPortalsPage: React.FC = () => {
                 portalAgent,
                 selectedClientCreated,
                 selectedClientEmail,
-                selectedClientPhone
+                selectedClientPhone,
+                clientType as 'buyer' | 'seller'
             );
             setIsModalOpen(false);
             setClientType('');

@@ -90,6 +90,9 @@ const ClientPortalPublicView: React.FC = () => {
                         <Home size={32} />
                     </div>
                     <div>
+                        <div className="text-brand-green font-semibold uppercase tracking-[0.2em] text-sm mb-3">
+                            {portal.clientType === 'seller' ? 'Seller Timeline' : 'Buyer Timeline'}
+                        </div>
                         <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
                             Welcome, {portal.clientName}
                         </h1>
@@ -164,8 +167,8 @@ const ClientPortalPublicView: React.FC = () => {
                                         */}
                                         <div className="absolute left-6 md:left-1/2 transform -translate-x-1/2 flex items-center justify-center w-16 h-16 z-20">
                                             <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl ${milestone.isCompleted
-                                                    ? 'bg-brand-green shadow-brand-green/40 scale-110'
-                                                    : 'bg-slate-800 border-2 border-slate-700 text-slate-500 scale-100'
+                                                ? 'bg-brand-green shadow-brand-green/40 scale-110'
+                                                : 'bg-slate-800 border-2 border-slate-700 text-slate-500 scale-100'
                                                 }`}>
                                                 {milestone.isCompleted ? (
                                                     <CheckCircle2 size={24} className="text-white" />
@@ -178,8 +181,8 @@ const ClientPortalPublicView: React.FC = () => {
                                         {/* Content Card */}
                                         <div className={`w-full md:w-1/2 pl-24 md:pl-0 ${isEven ? 'md:pr-16 text-left md:text-right' : 'md:pl-16 text-left'}`}>
                                             <div className={`glass-card p-6 rounded-2xl border transition-all duration-300 hover:scale-[1.02] ${milestone.isCompleted
-                                                    ? 'bg-[#1c2336]/80 border-brand-green/30 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.15)] shadow-brand-green/5'
-                                                    : 'bg-slate-900/40 border-white/5 opacity-80'
+                                                ? 'bg-[#1c2336]/80 border-brand-green/30 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.15)] shadow-brand-green/5'
+                                                : 'bg-slate-900/40 border-white/5 opacity-80'
                                                 }`}>
                                                 <h3 className={`text-xl font-bold mb-2 tracking-wide ${milestone.isCompleted ? 'text-white' : 'text-slate-300'}`}>
                                                     {milestone.title}
@@ -190,8 +193,8 @@ const ClientPortalPublicView: React.FC = () => {
 
                                                 {/* Date indicator */}
                                                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${milestone.isCompleted
-                                                        ? 'bg-brand-green/10 text-brand-green'
-                                                        : 'bg-white/5 text-slate-400'
+                                                    ? 'bg-brand-green/10 text-brand-green'
+                                                    : 'bg-white/5 text-slate-400'
                                                     }`}>
                                                     <CalendarClock size={16} />
                                                     {milestone.isCompleted

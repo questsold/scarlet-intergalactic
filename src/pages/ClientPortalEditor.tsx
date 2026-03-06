@@ -176,7 +176,10 @@ const ClientPortalEditor: React.FC = () => {
                 {/* Info Card */}
                 <div className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row justify-between gap-6">
                     <div className="flex-1 space-y-4">
-                        <h1 className="text-3xl font-bold text-white tracking-tight">Timeline Editor</h1>
+                        <div className="text-brand-green font-semibold uppercase tracking-[0.2em] text-sm">
+                            {portal.clientType === 'seller' ? 'Seller Timeline' : 'Buyer Timeline'}
+                        </div>
+                        <h1 className="text-3xl font-bold text-white tracking-tight -mt-2">Timeline Editor</h1>
                         <div className="space-y-2">
                             <div className="flex items-center gap-3 text-slate-300">
                                 <UserIcon size={18} className="text-slate-500" />

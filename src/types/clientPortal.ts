@@ -14,6 +14,7 @@ export interface ClientPortal {
     clientName: string;
     clientEmail?: string;
     clientPhone?: string;
+    clientType?: 'buyer' | 'seller';
     propertyAddress: string;
     agentId: string; // To restrict access horizontally
     createdAt: number;
