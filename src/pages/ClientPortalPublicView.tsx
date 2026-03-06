@@ -212,7 +212,11 @@ const ClientPortalPublicView: React.FC = () => {
                                                         }`}>
                                                         <CalendarClock size={16} />
                                                         {milestone.isCompleted
-                                                            ? 'Completed'
+                                                            ? milestone.completedDate
+                                                                ? `Completed on ${new Date(milestone.completedDate).toLocaleDateString()}`
+                                                                : milestone.deadlineDate
+                                                                    ? `Completed on ${new Date(milestone.deadlineDate).toLocaleDateString()}`
+                                                                    : 'Completed'
                                                             : milestone.deadlineDate
                                                                 ? `Target: ${new Date(milestone.deadlineDate).toLocaleDateString()}`
                                                                 : 'Pending Target Date'}
