@@ -9,7 +9,7 @@ export const clientPortalService = {
     /**
      * Generates default milestones for a standard transaction process.
      */
-    generateDefaultMilestones(transaction?: BoldTrailTransaction, clientType: 'buyer' | 'seller' = 'buyer'): ClientPortalMilestone[] {
+    generateDefaultMilestones(transaction?: BoldTrailTransaction, clientType: 'buyer' | 'seller' = 'buyer', fubStage?: string): ClientPortalMilestone[] {
         if (clientType === 'seller') {
             return [
                 {
@@ -105,23 +105,43 @@ export const clientPortalService = {
             ];
         }
 
+        const safeStage = (fubStage || '').toLowerCase();
+
+        const isViewingHomesChecked = ['met with customer', 'showing homes', 'submitting offers', 'under contract'].includes(safeStage);
+        const isSubmittingOffersChecked = ['submitting offers', 'under contract'].includes(safeStage);
+
+        const getDateFromAttr = (nameRegex: RegExp): number | null => {
+            if (!transaction?.custom_attributes) return null;
+            const attr = transaction.custom_attributes.find(a =>
+                nameRegex.test((a.name || a.label || '').toLowerCase())
+            );
+            if (attr && attr.value) {
+                const parsed = new Date(attr.value).getTime();
+                return isNaN(parsed) ? null : parsed;
+            }
+            return null;
+        };
+
+        const dueDiligenceDate = getDateFromAttr(/due diligence/i);
+        const keyExchangeDate = getDateFromAttr(/key exchange/i);
+
         const milestones: ClientPortalMilestone[] = [
-            {
-                id: 'viewing_homes',
-                title: 'Viewing Homes',
-                description: 'Touring potential properties',
-                deadlineDate: null,
-                completedDate: null,
-                isCompleted: true, // usually past this if we have a transaction
-                order: 1
-            },
             {
                 id: 'pre_approval',
                 title: 'Pre-Approval',
                 description: 'Securing financing pre-approval with a lender',
                 deadlineDate: null,
                 completedDate: null,
-                isCompleted: true,
+                isCompleted: !!transaction || isViewingHomesChecked,
+                order: 1
+            },
+            {
+                id: 'viewing_homes',
+                title: 'Viewing Homes',
+                description: 'Touring potential properties',
+                deadlineDate: null,
+                completedDate: null,
+                isCompleted: !!transaction || isViewingHomesChecked,
                 order: 2
             },
             {
@@ -130,7 +150,7 @@ export const clientPortalService = {
                 description: 'Making an offer on a property',
                 deadlineDate: null,
                 completedDate: null,
-                isCompleted: true,
+                isCompleted: !!transaction || isSubmittingOffersChecked,
                 order: 3
             },
             {
@@ -139,16 +159,16 @@ export const clientPortalService = {
                 description: 'The seller has accepted your offer!',
                 deadlineDate: transaction?.acceptance_date || transaction?.created_at || null,
                 completedDate: transaction?.acceptance_date || transaction?.created_at || null,
-                isCompleted: true,
+                isCompleted: !!transaction,
                 order: 4
             },
             {
                 id: 'inspection_due_diligence',
                 title: 'Inspection & Due Diligence',
                 description: 'Deadline to complete property inspections',
-                deadlineDate: null,
-                completedDate: null,
-                isCompleted: false,
+                deadlineDate: dueDiligenceDate,
+                completedDate: dueDiligenceDate && transaction?.status === 'closed' ? dueDiligenceDate : null,
+                isCompleted: !!dueDiligenceDate && (dueDiligenceDate < Date.now() || transaction?.status === 'closed'),
                 order: 5
             },
             {
@@ -171,10 +191,10 @@ export const clientPortalService = {
             },
             {
                 id: 'closing_scheduled',
-                title: 'Closing Scheduled',
+                title: 'Closing Date',
                 description: 'Signing the final paperwork',
                 deadlineDate: transaction?.closing_date || null,
-                completedDate: null,
+                completedDate: transaction?.status === 'closed' ? transaction?.closing_date : null,
                 isCompleted: transaction?.status === 'closed',
                 order: 8
             },
@@ -182,8 +202,8 @@ export const clientPortalService = {
                 id: 'key_exchange',
                 title: 'Key Exchange',
                 description: 'Officially taking possession of your new home!',
-                deadlineDate: transaction?.closing_date || null,
-                completedDate: null,
+                deadlineDate: keyExchangeDate || transaction?.closing_date || null,
+                completedDate: transaction?.status === 'closed' ? (keyExchangeDate || transaction?.closing_date) : null,
                 isCompleted: transaction?.status === 'closed',
                 order: 9
             }
@@ -230,12 +250,13 @@ export const clientPortalService = {
         clientPhone?: string,
         clientType?: 'buyer' | 'seller',
         agentName?: string,
-        agentPhotoUrl?: string
+        agentPhotoUrl?: string,
+        fubStage?: string
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
 
-        const milestones = this.generateDefaultMilestones(undefined, clientType);
+        const milestones = this.generateDefaultMilestones(undefined, clientType, fubStage);
         if (questStartDate) {
             // Shift all other milestones up by 1 order
             milestones.forEach(m => m.order += 1);

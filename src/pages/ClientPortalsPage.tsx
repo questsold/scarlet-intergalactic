@@ -28,6 +28,7 @@ const ClientPortalsPage: React.FC = () => {
     const [selectedAgentPhotoUrl, setSelectedAgentPhotoUrl] = useState<string | null>(null);
     const [selectedClientEmail, setSelectedClientEmail] = useState<string | undefined>(undefined);
     const [selectedClientPhone, setSelectedClientPhone] = useState<string | undefined>(undefined);
+    const [selectedClientStage, setSelectedClientStage] = useState<string | undefined>(undefined);
 
     const [clientType, setClientType] = useState<'buyer' | 'seller' | ''>('');
     const [buyerStatus, setBuyerStatus] = useState<'looking' | 'under_contract' | ''>('');
@@ -109,7 +110,8 @@ const ClientPortalsPage: React.FC = () => {
                 selectedClientPhone,
                 clientType as 'buyer' | 'seller',
                 portalAgentName,
-                portalAgentPhotoUrl
+                portalAgentPhotoUrl,
+                selectedClientStage
             );
             setIsModalOpen(false);
             setClientType('');
@@ -333,6 +335,7 @@ const ClientPortalsPage: React.FC = () => {
                                                         setSelectedAgentPhotoUrl(person.assignedUserPicture || null);
                                                         setSelectedClientEmail(person.emails?.[0]?.value);
                                                         setSelectedClientPhone(person.phones?.[0]?.value);
+                                                        setSelectedClientStage(person.stage);
                                                     }}
                                                     className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex items-center justify-between group"
                                                 >
@@ -370,6 +373,7 @@ const ClientPortalsPage: React.FC = () => {
                                                 setSelectedAgentPhotoUrl(null);
                                                 setSelectedClientEmail(undefined);
                                                 setSelectedClientPhone(undefined);
+                                                setSelectedClientStage(undefined);
                                                 setSearchQuery('');
                                                 setSearchResults([]);
                                                 setClientType('');
