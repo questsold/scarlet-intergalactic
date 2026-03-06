@@ -15,10 +15,15 @@ import {
     AlertCircle,
     Mail,
     Phone,
-    Send
+    Send,
+    Briefcase,
+    Search,
+    X
 } from 'lucide-react';
 import { clientPortalService } from '../services/clientPortalService';
 import type { ClientPortal } from '../types/clientPortal';
+import { boldtrailApi } from '../services/boldtrailApi';
+import type { BoldTrailTransaction } from '../types/boldtrail';
 
 const ClientPortalEditor: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -28,6 +33,12 @@ const ClientPortalEditor: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+
+    // BoldTrail Data
+    const [isBTModalOpen, setIsBTModalOpen] = useState(false);
+    const [btSearchQuery, setBtSearchQuery] = useState('');
+    const [btTransactions, setBtTransactions] = useState<BoldTrailTransaction[]>([]);
+    const [loadingTxs, setLoadingTxs] = useState(false);
 
     useEffect(() => {
         const fetchPortal = async () => {
@@ -113,6 +124,58 @@ const ClientPortalEditor: React.FC = () => {
         window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
     };
 
+    const handleOpenBTModal = async () => {
+        setIsBTModalOpen(true);
+        if (btTransactions.length === 0) {
+            setLoadingTxs(true);
+            try {
+                const txs = await boldtrailApi.getTransactions(1000); // Fetch up to 1000 recent transactions
+                setBtTransactions(txs);
+            } catch (e) {
+                console.error("Failed to load BT transactions", e);
+            } finally {
+                setLoadingTxs(false);
+            }
+        }
+    };
+
+    const handleConnectBT = (tx: BoldTrailTransaction) => {
+        if (!portal) return;
+        const newDates = clientPortalService.generateDefaultMilestones(tx, portal.clientType);
+
+        const mergedMilestones = portal.milestones.map(existing => {
+            const updated = newDates.find(m => m.id === existing.id);
+            if (updated) {
+                return {
+                    ...existing,
+                    deadlineDate: updated.deadlineDate || existing.deadlineDate,
+                    completedDate: updated.completedDate || existing.completedDate,
+                    isCompleted: updated.isCompleted || existing.isCompleted
+                };
+            }
+            return existing;
+        });
+
+        // Also update address if it was generic
+        const newAddress = (portal.propertyAddress === 'TBD Address' || portal.propertyAddress === 'Buyer Search') && tx.address
+            ? `${tx.address}, ${tx.city}`
+            : portal.propertyAddress;
+
+        setPortal({
+            ...portal,
+            transactionId: tx.id.toString(),
+            propertyAddress: newAddress,
+            milestones: mergedMilestones
+        });
+        setIsBTModalOpen(false);
+    };
+
+    const filteredBTDocs = btTransactions.filter(tx =>
+        (tx.address && tx.address.toLowerCase().includes(btSearchQuery.toLowerCase())) ||
+        (tx.custom_id && tx.custom_id.toLowerCase().includes(btSearchQuery.toLowerCase()))
+    ).slice(0, 30); // Show max 30 results for performance
+
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -158,7 +221,13 @@ const ClientPortalEditor: React.FC = () => {
                         <ArrowLeft size={18} /> Back to Portals
                     </button>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            onClick={handleOpenBTModal}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg font-medium hover:bg-indigo-500/20 transition-all"
+                        >
+                            <Briefcase size={18} /> {portal.transactionId && !portal.transactionId.toString().startsWith('manual_') ? 'Re-Connect BT' : 'Connect BoldTrail'}
+                        </button>
                         <button
                             onClick={handleSendInvite}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg font-medium hover:bg-blue-500/20 transition-all"
@@ -308,6 +377,79 @@ const ClientPortalEditor: React.FC = () => {
                 </div>
 
             </div>
+
+            {/* BoldTrail Connect Modal */}
+            {isBTModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-[#1c2336] rounded-2xl border border-white/10 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-slate-800/20">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Briefcase className="text-indigo-400" />
+                                    Connect with BoldTrail
+                                </h2>
+                                <p className="text-sm text-slate-400 mt-1">Select a transaction to pre-fill timeline dates.</p>
+                            </div>
+                            <button onClick={() => setIsBTModalOpen(false)} className="text-slate-400 hover:text-white transition-colors p-2 bg-white/5 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="relative mb-6">
+                                <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by property address..."
+                                    value={btSearchQuery}
+                                    onChange={(e) => setBtSearchQuery(e.target.value)}
+                                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-brand-green/50 focus:ring-1 focus:ring-brand-green/50 transition-all"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="space-y-3 overflow-y-auto max-h-[40vh] custom-scrollbar pr-2">
+                                {loadingTxs ? (
+                                    <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                                        <Loader2 size={32} className="animate-spin text-brand-green mb-2" />
+                                        Fetching recent transactions...
+                                    </div>
+                                ) : btTransactions.length === 0 ? (
+                                    <div className="py-8 text-center text-slate-400">
+                                        No transactions found in BoldTrail.
+                                    </div>
+                                ) : filteredBTDocs.length === 0 ? (
+                                    <div className="py-8 text-center text-slate-400">
+                                        No transactions matching "{btSearchQuery}"
+                                    </div>
+                                ) : (
+                                    filteredBTDocs.map(tx => (
+                                        <button
+                                            key={tx.id}
+                                            onClick={() => handleConnectBT(tx)}
+                                            className="w-full text-left bg-slate-900/40 hover:bg-white/5 border border-white/5 hover:border-indigo-500/30 rounded-xl p-4 transition-all group flex items-start justify-between"
+                                        >
+                                            <div>
+                                                <h4 className="font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">
+                                                    {tx.address ? `${tx.address}, ${tx.city}` : `Transaction #${tx.id}`}
+                                                </h4>
+                                                <div className="flex gap-4 mt-2 text-sm text-slate-500 text-left flex-wrap">
+                                                    <span className="capitalize text-slate-400">{tx.status} • {tx.representing}</span>
+                                                    <span>{tx.total_gross_commission > 0 ? `$${(tx.price).toLocaleString()}` : ''}</span>
+                                                    {tx.acceptance_date && <span>Accepted: {new Date(tx.acceptance_date).toLocaleDateString()}</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-indigo-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                Select <ArrowLeft className="rotate-180" size={14} />
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 };
