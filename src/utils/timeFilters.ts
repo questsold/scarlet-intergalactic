@@ -64,7 +64,13 @@ export const filterByTimeframe = <T extends { created?: string, createdAt?: stri
     }
 
     return data.filter(item => {
-        const itemDateVal = 'createdAt' in item ? (item as any).createdAt : ('created_at' in item ? (item as any).created_at : (item as any).created);
+        let itemDateVal = 'createdAt' in item ? (item as any).createdAt : ('created_at' in item ? (item as any).created_at : (item as any).created);
+
+        // Handle UNIX timestamps in seconds
+        if (typeof itemDateVal === 'number' && itemDateVal < 9999999999) {
+            itemDateVal = itemDateVal * 1000;
+        }
+
         const itemDate = new Date(itemDateVal);
 
         let isValid = true;
