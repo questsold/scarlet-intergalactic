@@ -8,9 +8,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Allow agents to read/write Client Portals
+    // Allow anyone to view a specific portal if they have the ID, but only agents can list/edit them
     match /client_portals/{portalId} {
-      allow read, write: if request.auth != null;
+      allow get: if true;
+      allow list, write: if request.auth != null;
     }
   }
 }
