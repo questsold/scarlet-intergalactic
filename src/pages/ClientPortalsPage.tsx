@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { AppWindow, Loader2, Plus, ArrowRight, Clock, MapPin, Trash2, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { searchPeople } from '../services/fubApi';
+import { searchPeople, fetchUsers } from '../services/fubApi';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../services/firebase';
 import { clientPortalService } from '../services/clientPortalService';
@@ -14,6 +14,7 @@ const ClientPortalsPage: React.FC = () => {
     const [authUser] = useAuthState(auth);
     const [portals, setPortals] = useState<ClientPortal[]>([]);
     const [loading, setLoading] = useState(true);
+    const [fubUserAvatar, setFubUserAvatar] = useState<string | null>(null);
     const navigate = useNavigate();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,7 +98,7 @@ const ClientPortalsPage: React.FC = () => {
             const finalAddress = needsAddress ? propertyAddress : 'Buyer Search';
             const portalAgent = selectedAgentEmail || authUser.email;
             const portalAgentName = selectedAgentName || authUser.displayName || undefined;
-            const portalAgentPhotoUrl = selectedAgentPhotoUrl || authUser.photoURL || undefined;
+            const portalAgentPhotoUrl = selectedAgentPhotoUrl || fubUserAvatar || undefined;
 
             const newPortalId = await clientPortalService.createManualPortal(
                 selectedClientName,
@@ -127,6 +128,17 @@ const ClientPortalsPage: React.FC = () => {
 
         const checkAdminAndFetch = async () => {
             try {
+                // Fetch FUB profile avatar for fallback
+                try {
+                    const fubUsers = await fetchUsers();
+                    const match = fubUsers.users?.find(u => u.email?.toLowerCase() === authUser.email?.toLowerCase());
+                    if (match?.picture) {
+                        setFubUserAvatar(match.picture["162x162"] || match.picture["60x60"] || match.picture.original || null);
+                    }
+                } catch (e) {
+                    console.error("Failed fetching FUB user for avatar fallback", e);
+                }
+
                 let adminStatus = false;
                 try {
                     const userDoc = await getDoc(doc(db, 'allowed_users', authUser.email!.toLowerCase()));
@@ -248,7 +260,7 @@ const ClientPortalsPage: React.FC = () => {
                                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
                                             <span className="text-slate-500 text-sm">Agent:</span>
                                             <div className="flex items-center gap-2">
-                                                {portal.agentPhotoUrl ? (
+                                                {typeof portal.agentPhotoUrl === 'string' && portal.agentPhotoUrl.startsWith('http') ? (
                                                     <img src={portal.agentPhotoUrl} alt="Agent" className="w-6 h-6 rounded-full object-cover border border-white/10" />
                                                 ) : (
                                                     <div className="w-6 h-6 rounded-full flex items-center justify-center bg-brand-green/20 text-brand-green border border-brand-green/30 text-[10px] font-bold cursor-default">

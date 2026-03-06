@@ -49,10 +49,14 @@ export default async function handler(req, res) {
             const usersData = await usersResponse.json();
             const userMap = {};
             (usersData.users || []).forEach(user => {
+                let pictureUrl = null;
+                if (user.picture) {
+                    pictureUrl = user.picture["162x162"] || user.picture["60x60"] || user.picture.original || null;
+                }
                 userMap[user.id] = {
                     email: user.email,
                     name: user.name,
-                    picture: user.picture
+                    picture: pictureUrl
                 };
             });
 
