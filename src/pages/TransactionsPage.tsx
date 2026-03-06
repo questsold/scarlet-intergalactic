@@ -14,7 +14,7 @@ import { clientPortalService } from '../services/clientPortalService';
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
-    const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
+    const [agents, setAgents] = useState<{ id: number; name: string; email?: string; avatarUrl?: string }[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -93,6 +93,14 @@ const TransactionsPage: React.FC = () => {
                         return true;
                     }
                     return false;
+                }).map(u => {
+                    const matchedFub = fubAgents.find((fa: any) => fa.email?.toLowerCase() === u.email?.toLowerCase());
+                    return {
+                        id: u.id,
+                        name: u.name,
+                        email: u.email,
+                        avatarUrl: matchedFub?.picture?.["162x162"] || matchedFub?.picture?.["60x60"] || matchedFub?.picture?.original || undefined
+                    };
                 });
 
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
@@ -356,8 +364,24 @@ const TransactionsPage: React.FC = () => {
                                                         {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : isOppSeller ? 'pre-listing' : isOppBuyer ? 'opportunity' : tx.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm">
-                                                    {agentName}
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {foundAgent?.avatarUrl ? (
+                                                            <img
+                                                                src={foundAgent.avatarUrl}
+                                                                alt={agentName}
+                                                                className="w-8 h-8 rounded-full object-cover ring-2 ring-white/10 shrink-0"
+                                                                referrerPolicy="no-referrer"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-white/10">
+                                                                <span className="text-xs font-medium text-slate-400">
+                                                                    {agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        <span className="text-slate-300 font-medium whitespace-nowrap">{agentName}</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                                                     ${(tx.price || tx.sales_volume || 0).toLocaleString()}
