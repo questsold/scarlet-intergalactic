@@ -12,7 +12,9 @@ import {
     ExternalLink,
     MapPin,
     User as UserIcon,
-    AlertCircle
+    AlertCircle,
+    Mail,
+    Phone
 } from 'lucide-react';
 import { clientPortalService } from '../services/clientPortalService';
 import type { ClientPortal } from '../types/clientPortal';
@@ -186,6 +188,33 @@ const ClientPortalEditor: React.FC = () => {
                                     placeholder="Client Name"
                                 />
                             </div>
+
+                            {(portal.clientEmail !== undefined || true) && (
+                                <div className="flex items-center gap-3 text-slate-400">
+                                    <Mail size={16} className="text-slate-500" />
+                                    <input
+                                        type="email"
+                                        value={portal.clientEmail || ''}
+                                        onChange={(e) => setPortal({ ...portal, clientEmail: e.target.value })}
+                                        className="bg-transparent border-b border-transparent hover:border-white/20 focus:border-brand-green focus:outline-none transition-colors text-sm w-full max-w-sm px-1 py-0.5"
+                                        placeholder="Add email address..."
+                                    />
+                                </div>
+                            )}
+
+                            {(portal.clientPhone !== undefined || true) && (
+                                <div className="flex items-center gap-3 text-slate-400">
+                                    <Phone size={16} className="text-slate-500" />
+                                    <input
+                                        type="tel"
+                                        value={portal.clientPhone || ''}
+                                        onChange={(e) => setPortal({ ...portal, clientPhone: e.target.value })}
+                                        className="bg-transparent border-b border-transparent hover:border-white/20 focus:border-brand-green focus:outline-none transition-colors text-sm w-full max-w-sm px-1 py-0.5"
+                                        placeholder="Add phone number..."
+                                    />
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-3 text-slate-400">
                                 <MapPin size={18} className="text-slate-500" />
                                 <span className="px-1">{portal.propertyAddress}</span>

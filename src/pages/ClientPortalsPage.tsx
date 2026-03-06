@@ -24,6 +24,8 @@ const ClientPortalsPage: React.FC = () => {
     const [selectedClientName, setSelectedClientName] = useState('');
     const [selectedClientCreated, setSelectedClientCreated] = useState<number | undefined>(undefined);
     const [selectedAgentEmail, setSelectedAgentEmail] = useState<string | null>(null);
+    const [selectedClientEmail, setSelectedClientEmail] = useState<string | undefined>(undefined);
+    const [selectedClientPhone, setSelectedClientPhone] = useState<string | undefined>(undefined);
 
     const [clientType, setClientType] = useState<'buyer' | 'seller' | ''>('');
     const [buyerStatus, setBuyerStatus] = useState<'looking' | 'under_contract' | ''>('');
@@ -98,7 +100,9 @@ const ClientPortalsPage: React.FC = () => {
                 selectedClientName,
                 finalAddress,
                 portalAgent,
-                selectedClientCreated
+                selectedClientCreated,
+                selectedClientEmail,
+                selectedClientPhone
             );
             setIsModalOpen(false);
             setClientType('');
@@ -299,6 +303,8 @@ const ClientPortalsPage: React.FC = () => {
                                                         setSelectedClientName(person.name);
                                                         setSelectedClientCreated(person.created ? new Date(person.created).getTime() : undefined);
                                                         setSelectedAgentEmail(person.assignedUserEmail || null);
+                                                        setSelectedClientEmail(person.emails?.[0]?.value);
+                                                        setSelectedClientPhone(person.phones?.[0]?.value);
                                                     }}
                                                     className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex items-center justify-between group"
                                                 >
@@ -332,6 +338,8 @@ const ClientPortalsPage: React.FC = () => {
                                                 setSelectedClientName('');
                                                 setSelectedClientCreated(undefined);
                                                 setSelectedAgentEmail(null);
+                                                setSelectedClientEmail(undefined);
+                                                setSelectedClientPhone(undefined);
                                                 setSearchQuery('');
                                                 setSearchResults([]);
                                                 setClientType('');

@@ -12,6 +12,8 @@ export interface ClientPortal {
     id: string; // The Firestore document ID, acts as the public link ID
     transactionId: string | number; // Backoffice/BoldTrail ID this is tied to
     clientName: string;
+    clientEmail?: string;
+    clientPhone?: string;
     propertyAddress: string;
     agentId: string; // To restrict access horizontally
     createdAt: number;

@@ -130,7 +130,9 @@ export const clientPortalService = {
         clientName: string,
         propertyAddress: string,
         agentEmail: string,
-        questStartDate?: number
+        questStartDate?: number,
+        clientEmail?: string,
+        clientPhone?: string
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
@@ -155,6 +157,8 @@ export const clientPortalService = {
             id: portalRef.id,
             transactionId: `manual_${now}`,
             clientName: clientName,
+            clientEmail: clientEmail,
+            clientPhone: clientPhone,
             propertyAddress: propertyAddress || 'TBD Address',
             agentId: agentEmail.toLowerCase(),
             createdAt: now,
