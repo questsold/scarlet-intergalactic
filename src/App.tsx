@@ -95,7 +95,7 @@ function App() {
   // inside productionTableData and agentDealMap instead of createdAt-based filtering.
 
   const LOCAL_STORAGE_KEY = 'bt_tx_parts_v1';
-  const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
+  const [txParticipants] = useState<Record<number, number[]>>(() => {
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) return JSON.parse(cached);
@@ -103,101 +103,7 @@ function App() {
     return {};
   });
 
-  useEffect(() => {
-    if (transactions.length === 0) return;
 
-    const now = new Date();
-    let rangeStart: Date | null = null;
-    let rangeEnd: Date | null = null;
-    if (timeframe !== 'All Time') {
-      switch (timeframe) {
-        case 'This Week': {
-          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
-          rangeStart = d;
-          rangeEnd = new Date(d);
-          rangeEnd.setDate(rangeEnd.getDate() + 7);
-          break;
-        }
-        case 'This Month':
-          rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-          break;
-        case 'Last Month':
-          rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'This Quarter': {
-          const qm = Math.floor(now.getMonth() / 3) * 3;
-          rangeStart = new Date(now.getFullYear(), qm, 1);
-          rangeEnd = new Date(now.getFullYear(), qm + 3, 1);
-          break;
-        }
-        case 'This Year':
-          rangeStart = new Date(now.getFullYear(), 0, 1);
-          rangeEnd = new Date(now.getFullYear() + 1, 0, 1);
-          break;
-        case '2025':
-          rangeStart = new Date(2025, 0, 1); rangeEnd = new Date(2026, 0, 1); break;
-        case '2024':
-          rangeStart = new Date(2024, 0, 1); rangeEnd = new Date(2025, 0, 1); break;
-        case 'Custom':
-          if (customStartDate) rangeStart = new Date(customStartDate);
-          if (customEndDate) { const e = new Date(customEndDate); e.setDate(e.getDate() + 1); rangeEnd = e; }
-          break;
-      }
-    }
-
-    const inRange = (dateParam: string | number | undefined | null): boolean => {
-      if (!dateParam) return false;
-      const d = new Date(dateParam);
-      if (rangeStart && d < rangeStart) return false;
-      if (rangeEnd && d >= rangeEnd) return false;
-      return true;
-    };
-
-    const neededTxIds = new Set<number>();
-
-    transactions.forEach(tx => {
-      if (tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        neededTxIds.add(tx.id);
-      }
-      const contractDateStr = tx.acceptance_date || tx.created_at;
-      const isWritten = timeframe === 'All Time' || inRange(contractDateStr);
-      const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
-      if (isWritten && allowedWrittenStatuses.includes(tx.status)) {
-        neededTxIds.add(tx.id);
-      }
-      const closeDateStr = tx.closing_date;
-      if (tx.status === 'closed' && (timeframe === 'All Time' || inRange(closeDateStr))) {
-        neededTxIds.add(tx.id);
-      }
-    });
-
-    const missingIds = Array.from(neededTxIds).filter(id => !txParticipants[id]);
-
-    if (missingIds.length > 0) {
-      boldtrailApi.getTransactionParticipants(missingIds).then(res => {
-        setTxParticipants(prev => {
-          const next = { ...prev };
-          let changed = false;
-          for (const [txIdStr, pUsers] of Object.entries(res)) {
-            if ((pUsers as any).error === 429) continue; // Rate limited, skip caching it
-            const txId = parseInt(txIdStr);
-            const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
-            const targets = owners.length > 0 ? owners : (pUsers as any[]);
-            const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
-            next[txId] = agentIds;
-            changed = true;
-          }
-          if (changed) {
-            try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next)); } catch (e) { }
-          }
-          return next;
-        });
-      });
-    }
-  }, [transactions, timeframe, customStartDate, customEndDate, txParticipants]);
 
 
   const agentTableData = useMemo(() => {
@@ -394,8 +300,16 @@ function App() {
       }
 
       // Map agent production
-      const btAgentIds = txParticipants[tx.id] || [];
-      for (const btAgentId of btAgentIds) {
+      let btAgentIds = txParticipants[tx.id];
+      if (!btAgentIds || btAgentIds.length === 0) {
+        btAgentIds = [];
+        if (tx.buying_side_representer?.id) btAgentIds.push(tx.buying_side_representer.id);
+        if (tx.listing_side_representer?.id) btAgentIds.push(tx.listing_side_representer.id);
+      }
+
+      const uniqueBtAgentIds = Array.from(new Set(btAgentIds));
+
+      for (const btAgentId of uniqueBtAgentIds) {
         const agentName = btIdToNameMap.get(btAgentId);
         const agentEmail = btIdToEmailMap.get(btAgentId);
 
