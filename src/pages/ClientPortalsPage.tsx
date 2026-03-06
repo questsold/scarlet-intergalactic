@@ -21,8 +21,14 @@ const ClientPortalsPage: React.FC = () => {
 
         const checkAdminAndFetch = async () => {
             try {
-                const userDoc = await getDoc(doc(db, 'allowed_users', authUser.email!.toLowerCase()));
-                const adminStatus = userDoc.exists() && userDoc.data().role === 'admin';
+                let adminStatus = false;
+                try {
+                    const userDoc = await getDoc(doc(db, 'allowed_users', authUser.email!.toLowerCase()));
+                    adminStatus = userDoc.exists() && userDoc.data().role === 'admin';
+                } catch (e) {
+                    const isFounder = authUser.email?.toLowerCase() === 'ali@questsold.com' || authUser.email?.toLowerCase() === 'admin@questsold.com';
+                    adminStatus = isFounder;
+                }
                 setIsAdmin(adminStatus);
 
                 let fetchedPortals: ClientPortal[] = [];
