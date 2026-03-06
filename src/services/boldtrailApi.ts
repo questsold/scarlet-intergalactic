@@ -58,10 +58,10 @@ class BoldTrailApi {
     async getTransactions(limit: number = 10000): Promise<BoldTrailTransaction[]> {
         const allTransactions: BoldTrailTransaction[] = [];
         let startingFromId: number | undefined = undefined;
-        const batchSize = 1000;
 
         try {
             while (allTransactions.length < limit) {
+                const batchSize = Math.min(1000, limit - allTransactions.length);
                 let url = `/api/transactions?count=${batchSize}&sort_by=created_at&sort_order=desc`;
                 if (startingFromId) {
                     url += `&starting_from_id=${startingFromId}`;
