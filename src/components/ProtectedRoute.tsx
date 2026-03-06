@@ -39,7 +39,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
                                     role: 'admin',
                                     name: firebaseUser.displayName || existingData.name || 'Admin'
                                 };
-                                await setDoc(docRef, upgradedAccess);
+                                try { await setDoc(docRef, upgradedAccess); } catch (e) { console.warn("Could not save upgraded founder access to db, ignoring."); }
                                 setAccessData(upgradedAccess);
                             } else {
                                 setAccessData(existingData);
@@ -53,7 +53,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
                                     email: emailStr,
                                     name: firebaseUser.displayName || 'Admin'
                                 };
-                                await setDoc(docRef, newAccess);
+                                try { await setDoc(docRef, newAccess); } catch (e) { console.warn("Could not save new founder access to db, ignoring."); }
                                 setAccessData(newAccess);
                             } else {
                                 // If they just created an account, they don't have access yet by default
@@ -62,7 +62,13 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
                     } catch (error) {
                         console.error("Error fetching access data:", error);
-                        setAccessData({ hasAccess: false, role: 'user' });
+                        // If there is a permission error, founders should still get in.
+                        const isFounder = (firebaseUser.email?.toLowerCase() === 'ali@questsold.com' || firebaseUser.email?.toLowerCase() === 'admin@questsold.com');
+                        if (isFounder) {
+                            setAccessData({ hasAccess: true, role: 'admin', email: firebaseUser.email?.toLowerCase(), name: firebaseUser.displayName || 'Admin' });
+                        } else {
+                            setAccessData({ hasAccess: false, role: 'user' });
+                        }
                     }
                 }
             } else {
