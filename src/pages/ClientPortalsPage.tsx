@@ -23,6 +23,11 @@ const ClientPortalsPage: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [selectedClientName, setSelectedClientName] = useState('');
     const [selectedClientCreated, setSelectedClientCreated] = useState<number | undefined>(undefined);
+
+    const [clientType, setClientType] = useState<'buyer' | 'seller' | ''>('');
+    const [buyerStatus, setBuyerStatus] = useState<'looking' | 'under_contract' | ''>('');
+    const [sellerStatus, setSellerStatus] = useState<'signed' | 'active_listing' | 'under_contract' | ''>('');
+
     const [propertyAddress, setPropertyAddress] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
@@ -71,19 +76,31 @@ const ClientPortalsPage: React.FC = () => {
     }, [propertyAddress, showAddressDropdown]);
 
     const handleCreatePortal = async () => {
-        if (!selectedClientName || !propertyAddress || !authUser?.email) {
-            alert("Please select a client and enter a property address.");
+        const needsAddress = buyerStatus === 'under_contract' || sellerStatus !== '';
+
+        if (!selectedClientName || !authUser?.email) {
+            alert("Please select a client.");
             return;
         }
+
+        if (needsAddress && !propertyAddress) {
+            alert("Please enter a property address.");
+            return;
+        }
+
         setIsCreating(true);
         try {
+            const finalAddress = needsAddress ? propertyAddress : 'Buyer Search';
             const newPortalId = await clientPortalService.createManualPortal(
                 selectedClientName,
-                propertyAddress,
+                finalAddress,
                 authUser.email,
                 selectedClientCreated
             );
             setIsModalOpen(false);
+            setClientType('');
+            setBuyerStatus('');
+            setSellerStatus('');
             navigate(`/portals/${newPortalId}`);
         } catch (err) {
             console.error("Error creating portal:", err);
@@ -307,64 +324,108 @@ const ClientPortalsPage: React.FC = () => {
                                             <div className="text-white font-medium text-lg">{selectedClientName}</div>
                                         </div>
                                         <button
-                                            onClick={() => { setSelectedClientName(''); setSelectedClientCreated(undefined); setSearchQuery(''); setSearchResults([]); }}
+                                            onClick={() => {
+                                                setSelectedClientName('');
+                                                setSelectedClientCreated(undefined);
+                                                setSearchQuery('');
+                                                setSearchResults([]);
+                                                setClientType('');
+                                                setBuyerStatus('');
+                                                setSellerStatus('');
+                                                setPropertyAddress('');
+                                            }}
                                             className="text-slate-400 hover:text-white text-sm"
                                         >
                                             Change
                                         </button>
                                     </div>
 
-                                    <div className="space-y-2 relative">
-                                        <label className="block text-sm font-medium text-slate-300">Property Address</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={propertyAddress}
-                                                onChange={(e) => {
-                                                    setPropertyAddress(e.target.value);
-                                                    setShowAddressDropdown(true);
-                                                }}
-                                                placeholder="e.g. 123 Main St"
-                                                className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-green/50 text-white placeholder-slate-500 transition-all"
-                                            />
-                                            {isSearchingAddress && (
-                                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                                    <Loader2 size={16} className="text-brand-green animate-spin" />
+                                    {!clientType ? (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                            <label className="block text-sm font-medium text-slate-300">Client Type</label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <button onClick={() => setClientType('buyer')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium flex flex-col items-center justify-center gap-2">
+                                                    Buyer
+                                                </button>
+                                                <button onClick={() => setClientType('seller')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium flex flex-col items-center justify-center gap-2">
+                                                    Seller
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : clientType === 'buyer' && !buyerStatus ? (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                            <label className="block text-sm font-medium text-slate-300">Buyer Status</label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <button onClick={() => setBuyerStatus('looking')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Looking</button>
+                                                <button onClick={() => setBuyerStatus('under_contract')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Under Contract</button>
+                                            </div>
+                                        </div>
+                                    ) : clientType === 'seller' && !sellerStatus ? (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                            <label className="block text-sm font-medium text-slate-300">Seller Status</label>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <button onClick={() => setSellerStatus('signed')} className="py-3 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Signed</button>
+                                                <button onClick={() => setSellerStatus('active_listing')} className="py-3 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Active Listing</button>
+                                                <button onClick={() => setSellerStatus('under_contract')} className="py-3 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Under Contract</button>
+                                            </div>
+                                        </div>
+                                    ) : (buyerStatus === 'under_contract' || sellerStatus) ? (
+                                        <div className="space-y-2 relative animate-in fade-in slide-in-from-bottom-4">
+                                            <label className="block text-sm font-medium text-slate-300">Property Address</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={propertyAddress}
+                                                    onChange={(e) => {
+                                                        setPropertyAddress(e.target.value);
+                                                        setShowAddressDropdown(true);
+                                                    }}
+                                                    placeholder="e.g. 123 Main St"
+                                                    className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-green/50 text-white placeholder-slate-500 transition-all"
+                                                />
+                                                {isSearchingAddress && (
+                                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                        <Loader2 size={16} className="text-brand-green animate-spin" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {showAddressDropdown && addressResults.length > 0 && (
+                                                <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                                                    {addressResults.map((addr, idx) => {
+                                                        let formattedAddress = addr.display_name;
+                                                        if (addr.address) {
+                                                            const a = addr.address;
+                                                            const street = [a.house_number, a.road].filter(Boolean).join(' ');
+                                                            const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
+                                                            const stateZip = [a.state, a.postcode].filter(Boolean).join(' ');
+                                                            const parts = [street, city, stateZip].filter(Boolean);
+                                                            if (parts.length > 0) formattedAddress = parts.join(', ');
+                                                        }
+
+                                                        return (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    setPropertyAddress(formattedAddress);
+                                                                    setShowAddressDropdown(false);
+                                                                    setAddressResults([]);
+                                                                }}
+                                                                className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
+                                                            >
+                                                                <MapPin size={14} className="shrink-0 text-brand-green" />
+                                                                <span className="truncate">{formattedAddress}</span>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
-
-                                        {showAddressDropdown && addressResults.length > 0 && (
-                                            <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                                                {addressResults.map((addr, idx) => {
-                                                    let formattedAddress = addr.display_name;
-                                                    if (addr.address) {
-                                                        const a = addr.address;
-                                                        const street = [a.house_number, a.road].filter(Boolean).join(' ');
-                                                        const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
-                                                        const stateZip = [a.state, a.postcode].filter(Boolean).join(' ');
-                                                        const parts = [street, city, stateZip].filter(Boolean);
-                                                        if (parts.length > 0) formattedAddress = parts.join(', ');
-                                                    }
-
-                                                    return (
-                                                        <button
-                                                            key={idx}
-                                                            onClick={() => {
-                                                                setPropertyAddress(formattedAddress);
-                                                                setShowAddressDropdown(false);
-                                                                setAddressResults([]);
-                                                            }}
-                                                            className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
-                                                        >
-                                                            <MapPin size={14} className="shrink-0 text-brand-green" />
-                                                            <span className="truncate">{formattedAddress}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
+                                    ) : buyerStatus === 'looking' && (
+                                        <div className="p-4 bg-brand-green/10 text-brand-green rounded-xl border border-brand-green/20 animate-in fade-in slide-in-from-bottom-4">
+                                            Ready to create! No address is needed while the buyer is still looking.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -378,8 +439,15 @@ const ClientPortalsPage: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleCreatePortal}
-                                disabled={!selectedClientName || !propertyAddress || isCreating}
-                                className="px-5 py-2.5 bg-brand-green text-white rounded-xl font-medium hover:bg-brand-green/90 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                disabled={
+                                    !selectedClientName ||
+                                    !clientType ||
+                                    (clientType === 'buyer' && !buyerStatus) ||
+                                    (clientType === 'seller' && !sellerStatus) ||
+                                    ((buyerStatus === 'under_contract' || sellerStatus !== '') && !propertyAddress) ||
+                                    isCreating
+                                }
+                                className="px-5 py-2.5 bg-brand-green text-white rounded-xl font-medium hover:bg-brand-green/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {isCreating ? <Loader2 size={18} className="animate-spin" /> : <span>Create Portal</span>}
                             </button>
