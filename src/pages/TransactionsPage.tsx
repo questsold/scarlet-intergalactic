@@ -127,33 +127,7 @@ const TransactionsPage: React.FC = () => {
         fetchInitialData();
     }, []);
 
-    // Fetch participants for displayed transactions
-    useEffect(() => {
-        if (transactions.length === 0) return;
-        const missingIds = transactions.map(tx => tx.id).filter(id => !txParticipants[id]);
 
-        if (missingIds.length > 0) {
-            boldtrailApi.getTransactionParticipants(missingIds).then(res => {
-                setTxParticipants(prev => {
-                    const next = { ...prev };
-                    let changed = false;
-                    for (const [txIdStr, pUsers] of Object.entries(res)) {
-                        if ((pUsers as any).error === 429) continue;
-                        const txId = parseInt(txIdStr);
-                        const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
-                        const targets = owners.length > 0 ? owners : (pUsers as any[]);
-                        const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
-                        next[txId] = agentIds;
-                        changed = true;
-                    }
-                    if (changed) {
-                        try { localStorage.setItem('bt_tx_parts_v1', JSON.stringify(next)); } catch (e) { }
-                    }
-                    return next;
-                });
-            });
-        }
-    }, [transactions, txParticipants]);
 
     // Reset to page 1 when filters change
     useEffect(() => {
@@ -263,6 +237,34 @@ const TransactionsPage: React.FC = () => {
         const startIndex = (currentPage - 1) * pageSize;
         return filteredTransactions.slice(startIndex, startIndex + pageSize);
     }, [filteredTransactions, currentPage, pageSize]);
+
+    // Fetch participants for strictly displayed transactions to avoid hitting API rate limits
+    useEffect(() => {
+        if (paginatedTransactions.length === 0) return;
+        const missingIds = paginatedTransactions.map(tx => tx.id).filter(id => !txParticipants[id]);
+
+        if (missingIds.length > 0) {
+            boldtrailApi.getTransactionParticipants(missingIds).then(res => {
+                setTxParticipants(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    for (const [txIdStr, pUsers] of Object.entries(res)) {
+                        if ((pUsers as any).error === 429) continue;
+                        const txId = parseInt(txIdStr);
+                        const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
+                        const targets = owners.length > 0 ? owners : (pUsers as any[]);
+                        const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
+                        next[txId] = agentIds;
+                        changed = true;
+                    }
+                    if (changed) {
+                        try { localStorage.setItem('bt_tx_parts_v1', JSON.stringify(next)); } catch (e) { }
+                    }
+                    return next;
+                });
+            });
+        }
+    }, [paginatedTransactions, txParticipants]);
 
     const totalPages = Math.ceil(filteredTransactions.length / pageSize);
 
