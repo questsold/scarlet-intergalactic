@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle, Home } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
@@ -14,7 +14,7 @@ import { clientPortalService } from '../services/clientPortalService';
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
-    const [agents, setAgents] = useState<{ id: number; name: string; email?: string; avatarUrl?: string }[]>([]);
+    const [agents, setAgents] = useState<{ id: number; name: string; email?: string }[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -93,17 +93,13 @@ const TransactionsPage: React.FC = () => {
                         return true;
                     }
                     return false;
-                }).map(u => {
-                    const fubMatch = fubAgents.find((f: any) => f.email?.toLowerCase() === u.email?.toLowerCase());
-                    const avatarUrl = fubMatch?.picture?.["162x162"] || fubMatch?.picture?.["60x60"] || fubMatch?.picture?.original || undefined;
-                    return { id: u.id, name: u.name, email: u.email, avatarUrl };
                 });
 
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
                 setAgents(validAgents);
 
-                // Fetch transactions - limit to 1000 for performance/snappiness
-                const txs = await boldtrailApi.getTransactions(1000);
+                // Fetch transactions - get all to ensure we don't just grab the oldest ones
+                const txs = await boldtrailApi.getTransactions();
                 setTransactions(txs);
             } catch (err) {
                 console.error("Error loading transactions:", err);
@@ -157,10 +153,7 @@ const TransactionsPage: React.FC = () => {
             if (agentFilter.length > 0) {
                 const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
                 const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
-
-                if (!isBuyingAgent && !isListingAgent) {
-                    return false;
-                }
+                if (!isBuyingAgent && !isListingAgent) return false;
             }
 
             return true;
@@ -315,8 +308,8 @@ const TransactionsPage: React.FC = () => {
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('status')}>
                                         <div className="flex items-center gap-1">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
-                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors w-16" onClick={() => handleSort('agentName')}>
-                                        <div className="flex items-center justify-center gap-1">Agent {sortConfig.key === 'agentName' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
+                                    <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('agentName')}>
+                                        <div className="flex items-center gap-1">Agent {sortConfig.key === 'agentName' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
                                     </th>
                                     <th className="px-6 py-4 cursor-pointer hover:text-slate-200 transition-colors" onClick={() => handleSort('price')}>
                                         <div className="flex items-center gap-1">Price / Vol {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}</div>
@@ -343,7 +336,6 @@ const TransactionsPage: React.FC = () => {
                                         const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
                                         const foundAgent = agents.find(a => a.id === agentId);
                                         const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
-                                        const agentAvatar = foundAgent?.avatarUrl || '';
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
@@ -364,16 +356,8 @@ const TransactionsPage: React.FC = () => {
                                                         {tx.status === 'listing' ? 'active' : tx.status === 'pending' ? 'under contract' : isOppSeller ? 'pre-listing' : isOppBuyer ? 'opportunity' : tx.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-400">
-                                                    <div className="flex justify-center items-center h-full">
-                                                        {agentAvatar ? (
-                                                            <img src={agentAvatar} alt={agentName} title={agentName} className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10" />
-                                                        ) : (
-                                                            <div className="w-8 h-8 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center shrink-0 text-xs font-medium text-slate-300" title={agentName}>
-                                                                {agentName === 'Unknown Agent' ? <Home size={14} className="opacity-50" /> : agentName.substring(0, 2).toUpperCase()}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                <td className="px-6 py-4 text-slate-400 text-sm">
+                                                    {agentName}
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                                                     ${(tx.price || tx.sales_volume || 0).toLocaleString()}
