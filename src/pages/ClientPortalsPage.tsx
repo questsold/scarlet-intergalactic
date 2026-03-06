@@ -1,7 +1,7 @@
 // Create Portals List Component (ClientPortalsPage)
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { AppWindow, Loader2, Plus, ArrowRight, Clock, MapPin, Trash2, Search, X } from 'lucide-react';
+import { AppWindow, Loader2, Plus, ArrowRight, ArrowLeft, Clock, MapPin, Trash2, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { searchPeople, fetchUsers } from '../services/fubApi';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -401,7 +401,12 @@ const ClientPortalsPage: React.FC = () => {
                                         </div>
                                     ) : clientType === 'buyer' && !buyerStatus ? (
                                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                                            <label className="block text-sm font-medium text-slate-300">Buyer Status</label>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <button onClick={() => setClientType('')} className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                                                    <ArrowLeft size={16} />
+                                                </button>
+                                                <label className="block text-sm font-medium text-slate-300">Buyer Status</label>
+                                            </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <button onClick={() => setBuyerStatus('looking')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Looking</button>
                                                 <button onClick={() => setBuyerStatus('under_contract')} className="py-4 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Under Contract</button>
@@ -409,7 +414,12 @@ const ClientPortalsPage: React.FC = () => {
                                         </div>
                                     ) : clientType === 'seller' && !sellerStatus ? (
                                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                                            <label className="block text-sm font-medium text-slate-300">Seller Status</label>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <button onClick={() => setClientType('')} className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                                                    <ArrowLeft size={16} />
+                                                </button>
+                                                <label className="block text-sm font-medium text-slate-300">Seller Status</label>
+                                            </div>
                                             <div className="grid grid-cols-1 gap-3">
                                                 <button onClick={() => setSellerStatus('signed')} className="py-3 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Signed</button>
                                                 <button onClick={() => setSellerStatus('active_listing')} className="py-3 border border-white/10 rounded-xl hover:border-brand-green/50 hover:bg-white/5 transition-all text-white font-medium">Active Listing</button>
@@ -418,7 +428,12 @@ const ClientPortalsPage: React.FC = () => {
                                         </div>
                                     ) : (buyerStatus === 'under_contract' || sellerStatus) ? (
                                         <div className="space-y-2 relative animate-in fade-in slide-in-from-bottom-4">
-                                            <label className="block text-sm font-medium text-slate-300">Property Address</label>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <button onClick={() => { if (buyerStatus) setBuyerStatus(''); else setSellerStatus(''); }} className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                                                    <ArrowLeft size={16} />
+                                                </button>
+                                                <label className="block text-sm font-medium text-slate-300">Property Address</label>
+                                            </div>
                                             <div className="relative">
                                                 <input
                                                     type="text"
@@ -469,8 +484,15 @@ const ClientPortalsPage: React.FC = () => {
                                             )}
                                         </div>
                                     ) : buyerStatus === 'looking' && (
-                                        <div className="p-4 bg-brand-green/10 text-brand-green rounded-xl border border-brand-green/20 animate-in fade-in slide-in-from-bottom-4">
-                                            Ready to create! No address is needed while the buyer is still looking.
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <button onClick={() => setBuyerStatus('')} className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                                                    <ArrowLeft size={16} />
+                                                </button>
+                                            </div>
+                                            <div className="p-4 bg-brand-green/10 text-brand-green rounded-xl border border-brand-green/20">
+                                                Ready to create! No address is needed while the buyer is still looking.
+                                            </div>
                                         </div>
                                     )}
                                 </div>

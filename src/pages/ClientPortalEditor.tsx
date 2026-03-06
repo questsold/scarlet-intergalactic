@@ -46,6 +46,35 @@ const ClientPortalEditor: React.FC = () => {
             try {
                 const data = await clientPortalService.getPortal(id);
                 if (data) {
+                    if (data.transactionId && !data.transactionId.toString().startsWith('manual_')) {
+                        // Attempt to sync with BoldTrail
+                        const tx = await boldtrailApi.getTransaction(data.transactionId);
+                        if (tx) {
+                            const newDates = clientPortalService.generateDefaultMilestones(tx, data.clientType as 'buyer' | 'seller');
+                            const mergedMilestones = data.milestones.map(existing => {
+                                const updated = newDates.find(m => m.id === existing.id);
+                                if (updated) {
+                                    return {
+                                        ...existing,
+                                        deadlineDate: updated.deadlineDate || existing.deadlineDate,
+                                        completedDate: updated.completedDate || existing.completedDate,
+                                        isCompleted: updated.isCompleted || existing.isCompleted
+                                    };
+                                }
+                                return existing;
+                            });
+
+                            const newAddress = (data.propertyAddress === 'TBD Address' || data.propertyAddress === 'Buyer Search') && tx.address
+                                ? `${tx.address}, ${tx.city}`
+                                : data.propertyAddress;
+
+                            data.milestones = mergedMilestones;
+                            data.propertyAddress = newAddress;
+
+                            // Optionally, update the portal in DB immediately behind the scenes
+                            // clientPortalService.updatePortal(data.id, { milestones: mergedMilestones, propertyAddress: newAddress });
+                        }
+                    }
                     setPortal(data);
                 } else {
                     setError('Portal not found.');

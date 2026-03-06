@@ -106,6 +106,33 @@ class BoldTrailApi {
     }
 
     /**
+     * Fetches a single transaction from BoldTrail Backoffice by its ID.
+     */
+    async getTransaction(id: number | string): Promise<BoldTrailTransaction | null> {
+        try {
+            const url = `/api/transaction?id=${id}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`BoldTrail Transaction API Error for ID ${id}:`, response.status, errorText);
+                return null;
+            }
+
+            const data: BoldTrailTransaction = await response.json();
+            return data;
+        } catch (e) {
+            console.error('Failed to fetch transaction from BoldTrail', e);
+            return null;
+        }
+    }
+
+    /**
      * Fetches additional profile details for agents using the local Vercel proxy.
      * @param userIds Array of BoldTrail user IDs.
      * @returns A map of userId to user details.
