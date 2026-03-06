@@ -124,6 +124,32 @@ export const clientPortalService = {
     },
 
     /**
+     * Creates a new manual client portal not tied to a Boldtrail transaction.
+     */
+    async createManualPortal(
+        clientName: string,
+        propertyAddress: string,
+        agentEmail: string
+    ): Promise<string> {
+        const portalRef = doc(collection(db, PORTALS_COLLECTION));
+        const now = Date.now();
+
+        const portal: ClientPortal = {
+            id: portalRef.id,
+            transactionId: `manual_${now}`,
+            clientName: clientName,
+            propertyAddress: propertyAddress || 'TBD Address',
+            agentId: agentEmail.toLowerCase(),
+            createdAt: now,
+            updatedAt: now,
+            milestones: this.generateDefaultMilestones()
+        };
+
+        await setDoc(portalRef, portal);
+        return portalRef.id;
+    },
+
+    /**
      * Retrieves a single portal by ID (e.g., for the public view or editor).
      */
     async getPortal(id: string): Promise<ClientPortal | null> {

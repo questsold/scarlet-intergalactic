@@ -39,6 +39,18 @@ export const fetchAllPeople = async (): Promise<FubPeopleResponse> => {
     return fetchPeople(500, 0); // FUB API max limit is typically 100 per page, but we will handle this in components if needed, or ask user. Let's start with 100
 }
 
+export const searchPeople = async (nameQuery: string): Promise<FubPeopleResponse> => {
+    const response = await fetch(`${BASE_URL}/people?limit=10&name=${encodeURIComponent(nameQuery)}`, {
+        headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to search people: ${response.statusText}`);
+    }
+
+    return response.json();
+};
+
 export const fetchDeals = async (limit = 100, offset = 0): Promise<FubDealsResponse> => {
     const response = await fetch(`${BASE_URL}/deals?limit=${limit}&offset=${offset}`, {
         headers: getHeaders(),
