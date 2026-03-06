@@ -236,7 +236,7 @@ const ClientPortalPublicView: React.FC = () => {
                     className="mt-24 text-center pb-12"
                 >
                     <p className="text-slate-500 text-sm font-medium">
-                        Powered by <span className="text-brand-green font-bold opacity-80">QuestSold</span> Client Experience
+                        Powered by <span className="text-brand-green font-bold opacity-80">Quest Realty</span> Client Experience
                     </p>
                 </motion.div>
 
