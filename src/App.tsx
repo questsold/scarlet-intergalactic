@@ -56,7 +56,9 @@ function App() {
           setIsAdmin(false);
         }
       } catch (e) {
-        setIsAdmin(false);
+        // Graceful fallback for founders in case of firestore permission errors
+        const isFounder = authUser.email?.toLowerCase() === 'ali@questsold.com' || authUser.email?.toLowerCase() === 'admin@questsold.com';
+        setIsAdmin(isFounder);
       }
     };
     checkAdmin();
@@ -257,7 +259,13 @@ function App() {
     transactions.forEach(tx => {
       // Is this deal belonging to the logged in agent?
       let belongsToAgent = false;
-      const _btAgentIds = txParticipants[tx.id] || [];
+      let _btAgentIds = txParticipants[tx.id];
+      if (!_btAgentIds || _btAgentIds.length === 0) {
+        _btAgentIds = [];
+        if (tx.buying_side_representer?.id) _btAgentIds.push(tx.buying_side_representer.id);
+        if (tx.listing_side_representer?.id) _btAgentIds.push(tx.listing_side_representer.id);
+      }
+
       if (!authFubUserId) {
         belongsToAgent = true; // Admin sees all
       } else {
