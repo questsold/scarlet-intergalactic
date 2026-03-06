@@ -22,8 +22,14 @@ const ClientPortalsPage: React.FC = () => {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedClientName, setSelectedClientName] = useState('');
+    const [selectedClientCreated, setSelectedClientCreated] = useState<number | undefined>(undefined);
     const [propertyAddress, setPropertyAddress] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+
+    // Address Autocomplete states
+    const [addressResults, setAddressResults] = useState<any[]>([]);
+    const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+    const [showAddressDropdown, setShowAddressDropdown] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -44,6 +50,26 @@ const ClientPortalsPage: React.FC = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (propertyAddress.trim().length > 3 && showAddressDropdown) {
+                setIsSearchingAddress(true);
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(propertyAddress)}&format=json&addressdetails=1&limit=5&countrycodes=us`);
+                    const data = await res.json();
+                    setAddressResults(data);
+                } catch (err) {
+                    console.error("Failed to search addresses:", err);
+                } finally {
+                    setIsSearchingAddress(false);
+                }
+            } else {
+                setAddressResults([]);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [propertyAddress, showAddressDropdown]);
+
     const handleCreatePortal = async () => {
         if (!selectedClientName || !propertyAddress || !authUser?.email) {
             alert("Please select a client and enter a property address.");
@@ -54,7 +80,8 @@ const ClientPortalsPage: React.FC = () => {
             const newPortalId = await clientPortalService.createManualPortal(
                 selectedClientName,
                 propertyAddress,
-                authUser.email
+                authUser.email,
+                selectedClientCreated
             );
             setIsModalOpen(false);
             navigate(`/portals/${newPortalId}`);
@@ -248,7 +275,10 @@ const ClientPortalsPage: React.FC = () => {
                                             {searchResults.map(person => (
                                                 <button
                                                     key={person.id}
-                                                    onClick={() => setSelectedClientName(person.name)}
+                                                    onClick={() => {
+                                                        setSelectedClientName(person.name);
+                                                        setSelectedClientCreated(person.created ? new Date(person.created).getTime() : undefined);
+                                                    }}
                                                     className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex items-center justify-between group"
                                                 >
                                                     <div>
@@ -277,22 +307,51 @@ const ClientPortalsPage: React.FC = () => {
                                             <div className="text-white font-medium text-lg">{selectedClientName}</div>
                                         </div>
                                         <button
-                                            onClick={() => { setSelectedClientName(''); setSearchQuery(''); setSearchResults([]); }}
+                                            onClick={() => { setSelectedClientName(''); setSelectedClientCreated(undefined); setSearchQuery(''); setSearchResults([]); }}
                                             className="text-slate-400 hover:text-white text-sm"
                                         >
                                             Change
                                         </button>
                                     </div>
 
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 relative">
                                         <label className="block text-sm font-medium text-slate-300">Property Address / Goal</label>
-                                        <input
-                                            type="text"
-                                            value={propertyAddress}
-                                            onChange={(e) => setPropertyAddress(e.target.value)}
-                                            placeholder="e.g. 123 Main St or 'Buyer Search'"
-                                            className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-green/50 text-white placeholder-slate-500 transition-all"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={propertyAddress}
+                                                onChange={(e) => {
+                                                    setPropertyAddress(e.target.value);
+                                                    setShowAddressDropdown(true);
+                                                }}
+                                                placeholder="e.g. 123 Main St or 'Buyer Search'"
+                                                className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-green/50 text-white placeholder-slate-500 transition-all"
+                                            />
+                                            {isSearchingAddress && (
+                                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                    <Loader2 size={16} className="text-brand-green animate-spin" />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {showAddressDropdown && addressResults.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
+                                                {addressResults.map((addr, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setPropertyAddress(addr.display_name.split(',').slice(0, 3).join(',').trim());
+                                                            setShowAddressDropdown(false);
+                                                            setAddressResults([]);
+                                                        }}
+                                                        className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
+                                                    >
+                                                        <MapPin size={14} className="shrink-0 text-brand-green" />
+                                                        <span className="truncate">{addr.display_name.split(',').slice(0, 3).join(',')}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

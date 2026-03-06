@@ -129,10 +129,27 @@ export const clientPortalService = {
     async createManualPortal(
         clientName: string,
         propertyAddress: string,
-        agentEmail: string
+        agentEmail: string,
+        questStartDate?: number
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
+
+        const milestones = this.generateDefaultMilestones();
+        if (questStartDate) {
+            // Shift all other milestones up by 1 order
+            milestones.forEach(m => m.order += 1);
+            // Insert the quest started milestone
+            milestones.unshift({
+                id: `ms_${now}_quest_started`,
+                title: 'Quest Started',
+                description: 'You connected with the Quest team to start your journey.',
+                deadlineDate: questStartDate,
+                completedDate: questStartDate,
+                isCompleted: true,
+                order: 0
+            });
+        }
 
         const portal: ClientPortal = {
             id: portalRef.id,
@@ -142,7 +159,7 @@ export const clientPortalService = {
             agentId: agentEmail.toLowerCase(),
             createdAt: now,
             updatedAt: now,
-            milestones: this.generateDefaultMilestones()
+            milestones: milestones
         };
 
         await setDoc(portalRef, portal);
