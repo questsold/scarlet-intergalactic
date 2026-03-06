@@ -23,6 +23,7 @@ const ClientPortalsPage: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [selectedClientName, setSelectedClientName] = useState('');
     const [selectedClientCreated, setSelectedClientCreated] = useState<number | undefined>(undefined);
+    const [selectedAgentEmail, setSelectedAgentEmail] = useState<string | null>(null);
 
     const [clientType, setClientType] = useState<'buyer' | 'seller' | ''>('');
     const [buyerStatus, setBuyerStatus] = useState<'looking' | 'under_contract' | ''>('');
@@ -91,10 +92,12 @@ const ClientPortalsPage: React.FC = () => {
         setIsCreating(true);
         try {
             const finalAddress = needsAddress ? propertyAddress : 'Buyer Search';
+            const portalAgent = selectedAgentEmail || authUser.email;
+
             const newPortalId = await clientPortalService.createManualPortal(
                 selectedClientName,
                 finalAddress,
-                authUser.email,
+                portalAgent,
                 selectedClientCreated
             );
             setIsModalOpen(false);
@@ -295,6 +298,7 @@ const ClientPortalsPage: React.FC = () => {
                                                     onClick={() => {
                                                         setSelectedClientName(person.name);
                                                         setSelectedClientCreated(person.created ? new Date(person.created).getTime() : undefined);
+                                                        setSelectedAgentEmail(person.assignedUserEmail || null);
                                                     }}
                                                     className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex items-center justify-between group"
                                                 >
@@ -327,6 +331,7 @@ const ClientPortalsPage: React.FC = () => {
                                             onClick={() => {
                                                 setSelectedClientName('');
                                                 setSelectedClientCreated(undefined);
+                                                setSelectedAgentEmail(null);
                                                 setSearchQuery('');
                                                 setSearchResults([]);
                                                 setClientType('');

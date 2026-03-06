@@ -36,6 +36,31 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
+
+        // Fetch users to get assigned agent emails
+        const usersResponse = await fetch(`https://api.followupboss.com/v1/users?limit=100`, {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Basic ${Buffer.from(`${API_KEY}:`).toString('base64')}`
+            }
+        });
+
+        if (usersResponse.ok) {
+            const usersData = await usersResponse.json();
+            const userMap = {};
+            (usersData.users || []).forEach(user => {
+                userMap[user.id] = user.email;
+            });
+
+            // Annotate people with their assigned user's email
+            if (data.people) {
+                data.people = data.people.map(person => ({
+                    ...person,
+                    assignedUserEmail: userMap[person.assignedUserId] || null
+                }));
+            }
+        }
+
         res.status(200).json(data);
     } catch (error) {
         console.error(error);
