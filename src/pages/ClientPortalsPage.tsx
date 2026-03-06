@@ -9,6 +9,8 @@ import { auth, db } from '../services/firebase';
 import { clientPortalService } from '../services/clientPortalService';
 import type { ClientPortal } from '../types/clientPortal';
 import { doc, getDoc } from 'firebase/firestore';
+import { boldtrailApi } from '../services/boldtrailApi';
+import type { BoldTrailTransaction } from '../types/boldtrail';
 
 const ClientPortalsPage: React.FC = () => {
     const [authUser] = useAuthState(auth);
@@ -38,7 +40,7 @@ const ClientPortalsPage: React.FC = () => {
     const [isCreating, setIsCreating] = useState(false);
 
     // Address Autocomplete states
-    const [addressResults, setAddressResults] = useState<any[]>([]);
+    const [addressResults, setAddressResults] = useState<BoldTrailTransaction[]>([]);
     const [isSearchingAddress, setIsSearchingAddress] = useState(false);
     const [showAddressDropdown, setShowAddressDropdown] = useState(false);
 
@@ -66,11 +68,16 @@ const ClientPortalsPage: React.FC = () => {
             if (propertyAddress.trim().length > 2 && showAddressDropdown) {
                 setIsSearchingAddress(true);
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(propertyAddress)}&format=json&addressdetails=1&limit=5&countrycodes=us`);
-                    const data = await res.json();
-                    setAddressResults(data);
+                    const txs = await boldtrailApi.getTransactions(10000);
+                    const query = propertyAddress.toLowerCase();
+                    const matched = txs.filter(tx =>
+                        (tx.address && tx.address.toLowerCase().includes(query)) ||
+                        (tx.custom_id && tx.custom_id.toLowerCase().includes(query)) ||
+                        (tx.city && tx.city.toLowerCase().includes(query))
+                    ).slice(0, 10);
+                    setAddressResults(matched);
                 } catch (err) {
-                    console.error("Failed to search addresses:", err);
+                    console.error("Failed to search boldtrail addresses:", err);
                 } finally {
                     setIsSearchingAddress(false);
                 }
@@ -454,16 +461,8 @@ const ClientPortalsPage: React.FC = () => {
 
                                             {showAddressDropdown && addressResults.length > 0 && (
                                                 <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                                                    {addressResults.map((addr, idx) => {
-                                                        let formattedAddress = addr.display_name;
-                                                        if (addr.address) {
-                                                            const a = addr.address;
-                                                            const street = [a.house_number, a.road].filter(Boolean).join(' ');
-                                                            const city = a.city || a.town || a.village || a.hamlet || a.municipality || '';
-                                                            const stateZip = [a.state, a.postcode].filter(Boolean).join(' ');
-                                                            const parts = [street, city, stateZip].filter(Boolean);
-                                                            if (parts.length > 0) formattedAddress = parts.join(', ');
-                                                        }
+                                                    {addressResults.map((tx, idx) => {
+                                                        const formattedAddress = `${tx.address || ''}${tx.city ? `, ${tx.city}` : ''}${tx.state ? `, ${tx.state}` : ''}`;
 
                                                         return (
                                                             <button
@@ -473,10 +472,17 @@ const ClientPortalsPage: React.FC = () => {
                                                                     setShowAddressDropdown(false);
                                                                     setAddressResults([]);
                                                                 }}
-                                                                className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center gap-2"
+                                                                className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white border-b border-white/5 last:border-0 transition-colors flex items-center justify-between gap-2"
                                                             >
-                                                                <MapPin size={14} className="shrink-0 text-brand-green" />
-                                                                <span className="truncate">{formattedAddress}</span>
+                                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                                    <MapPin size={14} className="shrink-0 text-brand-green" />
+                                                                    <span className="truncate">{formattedAddress}</span>
+                                                                </div>
+                                                                {tx.status && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-slate-400 capitalize whitespace-nowrap hidden sm:inline-block">
+                                                                        {tx.status}
+                                                                    </span>
+                                                                )}
                                                             </button>
                                                         );
                                                     })}
