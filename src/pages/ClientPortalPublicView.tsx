@@ -192,17 +192,19 @@ const ClientPortalPublicView: React.FC = () => {
                                                 </p>
 
                                                 {/* Date indicator */}
-                                                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${milestone.isCompleted
-                                                    ? 'bg-brand-green/10 text-brand-green'
-                                                    : 'bg-white/5 text-slate-400'
-                                                    }`}>
-                                                    <CalendarClock size={16} />
-                                                    {milestone.isCompleted
-                                                        ? 'Completed'
-                                                        : milestone.deadlineDate
-                                                            ? `Target: ${new Date(milestone.deadlineDate).toLocaleDateString()}`
-                                                            : 'Pending Target Date'}
-                                                </div>
+                                                {milestone.id !== 'preparing_home' && (
+                                                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${milestone.isCompleted
+                                                        ? 'bg-brand-green/10 text-brand-green'
+                                                        : 'bg-white/5 text-slate-400'
+                                                        }`}>
+                                                        <CalendarClock size={16} />
+                                                        {milestone.isCompleted
+                                                            ? 'Completed'
+                                                            : milestone.deadlineDate
+                                                                ? `Target: ${new Date(milestone.deadlineDate).toLocaleDateString()}`
+                                                                : 'Pending Target Date'}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
