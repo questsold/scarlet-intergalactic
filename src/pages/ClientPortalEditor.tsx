@@ -158,9 +158,8 @@ const ClientPortalEditor: React.FC = () => {
         if (btTransactions.length === 0) {
             setLoadingTxs(true);
             try {
-                const txs = await boldtrailApi.getTransactions(100); // Fetch up to 100 to catch recents
-                const sortedTxs = [...txs].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-                setBtTransactions(sortedTxs);
+                const txs = await boldtrailApi.getTransactions(10000); // Fetch all, will be cached by API and return sorted
+                setBtTransactions(txs);
             } catch (e) {
                 console.error("Failed to load BT transactions", e);
             } finally {

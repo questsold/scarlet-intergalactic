@@ -1,5 +1,9 @@
 import type { BoldTrailTransaction, BoldTrailUser } from '../types/boldtrail';
 
+let cachedTransactions: BoldTrailTransaction[] | null = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 class BoldTrailApi {
     /**
      * Fetches all users from BoldTrail Backoffice
@@ -52,10 +56,16 @@ class BoldTrailApi {
     }
     /**
      * Fetches all transactions from BoldTrail Backoffice using the local Vercel proxy.
-     * Note: The boldtrail transactions API limits to 1000 items per request max,
-     * we will fetch up to max pages or as requested.
+     * Caches the results to prevent hitting API rate limits.
      */
     async getTransactions(limit: number = 10000): Promise<BoldTrailTransaction[]> {
+        if (cachedTransactions && (Date.now() - lastCacheTime < CACHE_DURATION)) {
+            // Return from cache if we want fewer or same items. 
+            // We sort by created_at desc so if limit < total, we get newest first.
+            const sortedCache = [...cachedTransactions].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            return sortedCache.slice(0, limit);
+        }
+
         const allTransactions: BoldTrailTransaction[] = [];
         let startingFromId: number | undefined = undefined;
 
@@ -98,7 +108,14 @@ class BoldTrailApi {
                 startingFromId = data[data.length - 1].id;
             }
 
-            return allTransactions.slice(0, limit);
+            // Update cache
+            if (allTransactions.length > 0) {
+                cachedTransactions = allTransactions;
+                lastCacheTime = Date.now();
+            }
+
+            const sorted = [...allTransactions].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            return sorted.slice(0, limit);
         } catch (e) {
             console.error('Failed to fetch transactions from BoldTrail', e);
             return [];

@@ -63,7 +63,7 @@ const ClientPortalsPage: React.FC = () => {
 
     useEffect(() => {
         const timer = setTimeout(async () => {
-            if (propertyAddress.trim().length > 3 && showAddressDropdown) {
+            if (propertyAddress.trim().length > 2 && showAddressDropdown) {
                 setIsSearchingAddress(true);
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(propertyAddress)}&format=json&addressdetails=1&limit=5&countrycodes=us`);
