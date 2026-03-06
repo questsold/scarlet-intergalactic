@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, UserCircle, FileSpreadsheet } from 'lucide-react';
+import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, UserCircle, FileSpreadsheet, AppWindow } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../services/firebase';
 
@@ -19,6 +19,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
     const navItems = [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { name: 'Transactions', icon: FileSpreadsheet, path: '/transactions' },
+        { name: 'Client Portals', icon: AppWindow, path: '/portals' },
         { name: 'Agents', icon: Users, path: '/agents' },
         { name: 'Reports', icon: BarChart3, path: '/reports' },
         { name: 'Marketing', icon: Megaphone, path: '/marketing' },

@@ -7,8 +7,6 @@ export interface BoldTrailUser {
     name: string;
     email: string;
     role: string;
-    owner?: boolean;
-    type?: string;
 }
 
 export interface BoldTrailTransaction {

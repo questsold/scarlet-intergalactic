@@ -11,6 +11,9 @@ import ReportsPage from './pages/ReportsPage.tsx'
 import KpiDealsPage from './pages/KpiDealsPage.tsx'
 import MarketingPage from './pages/MarketingPage.tsx'
 import TransactionsPage from './pages/TransactionsPage.tsx'
+import ClientPortalsPage from './pages/ClientPortalsPage.tsx'
+import ClientPortalEditor from './pages/ClientPortalEditor.tsx'
+import ClientPortalPublicView from './pages/ClientPortalPublicView.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
 
 createRoot(document.getElementById('root')!).render(
@@ -58,7 +61,20 @@ createRoot(document.getElementById('root')!).render(
             <KpiDealsPage />
           </ProtectedRoute>
         } />
+        <Route path="/portals" element={
+          <ProtectedRoute>
+            <ClientPortalsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/portals/:id" element={
+          <ProtectedRoute>
+            <ClientPortalEditor />
+          </ProtectedRoute>
+        } />
+        {/* Unprotected public client view */}
+        <Route path="/portal/:id" element={<ClientPortalPublicView />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
 )
+console.log('App ver', 4);

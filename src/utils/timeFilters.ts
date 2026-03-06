@@ -1,6 +1,6 @@
 export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
 
-export const filterByTimeframe = <T extends { created?: string | null, createdAt?: string | null, created_at?: number | null, listing_date?: number | null, acceptance_date?: number | null }>(
+export const filterByTimeframe = <T extends { created?: string, createdAt?: string, created_at?: number }>(
     data: T[],
     timeframe: Timeframe,
     customStartDate?: string,
@@ -65,14 +65,7 @@ export const filterByTimeframe = <T extends { created?: string | null, createdAt
 
     return data.filter(item => {
         const itemDateVal = 'createdAt' in item ? (item as any).createdAt : ('created_at' in item ? (item as any).created_at : (item as any).created);
-        if (!itemDateVal) return false;
-
-        // Handle Unix timestamps in seconds (like BoldTrail) vs milliseconds
-        const dateNum = typeof itemDateVal === 'number' ?
-            (itemDateVal > 9999999999 ? itemDateVal : itemDateVal * 1000) :
-            itemDateVal;
-
-        const itemDate = new Date(dateNum);
+        const itemDate = new Date(itemDateVal);
 
         let isValid = true;
         if (startDate) isValid = isValid && itemDate >= startDate;
