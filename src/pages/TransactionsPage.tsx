@@ -67,9 +67,9 @@ const TransactionsPage: React.FC = () => {
             setPortalClientName('');
             setSelectedTxForPortal(null);
             navigate(`/portals/${portalId}`);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating portal:", error);
-            alert("Failed to create portal.");
+            alert("Failed to create portal: " + (error?.message || error?.toString() || "Unknown error"));
         } finally {
             setCreatingPortal(false);
         }
