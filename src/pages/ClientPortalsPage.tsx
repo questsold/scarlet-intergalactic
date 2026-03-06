@@ -315,7 +315,7 @@ const ClientPortalsPage: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-2 relative">
-                                        <label className="block text-sm font-medium text-slate-300">Property Address / Goal</label>
+                                        <label className="block text-sm font-medium text-slate-300">Property Address</label>
                                         <div className="relative">
                                             <input
                                                 type="text"
@@ -324,7 +324,7 @@ const ClientPortalsPage: React.FC = () => {
                                                     setPropertyAddress(e.target.value);
                                                     setShowAddressDropdown(true);
                                                 }}
-                                                placeholder="e.g. 123 Main St or 'Buyer Search'"
+                                                placeholder="e.g. 123 Main St"
                                                 className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-green/50 text-white placeholder-slate-500 transition-all"
                                             />
                                             {isSearchingAddress && (
@@ -335,7 +335,7 @@ const ClientPortalsPage: React.FC = () => {
                                         </div>
 
                                         {showAddressDropdown && addressResults.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
+                                            <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
                                                 {addressResults.map((addr, idx) => (
                                                     <button
                                                         key={idx}
