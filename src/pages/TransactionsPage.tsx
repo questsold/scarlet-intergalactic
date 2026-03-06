@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle } from 'lucide-react';
+import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle, Home } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
@@ -14,7 +14,15 @@ import { clientPortalService } from '../services/clientPortalService';
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
-    const [agents, setAgents] = useState<{ id: number; name: string; email?: string; avatarUrl?: string }[]>([]);
+    const [agents, setAgents] = useState<{ id: number; userId?: number; name: string; email?: string; avatarUrl?: string }[]>([]);
+
+    const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
+        try {
+            const cached = localStorage.getItem('bt_tx_parts_v1');
+            if (cached) return JSON.parse(cached);
+        } catch (e) { }
+        return {};
+    });
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -97,6 +105,7 @@ const TransactionsPage: React.FC = () => {
                     const matchedFub = fubAgents.find((fa: any) => fa.email?.toLowerCase() === u.email?.toLowerCase());
                     return {
                         id: u.id,
+                        userId: u.user_id,
                         name: u.name,
                         email: u.email,
                         avatarUrl: matchedFub?.picture?.["162x162"] || matchedFub?.picture?.["60x60"] || matchedFub?.picture?.original || undefined
@@ -117,6 +126,34 @@ const TransactionsPage: React.FC = () => {
         };
         fetchInitialData();
     }, []);
+
+    // Fetch participants for displayed transactions
+    useEffect(() => {
+        if (transactions.length === 0) return;
+        const missingIds = transactions.map(tx => tx.id).filter(id => !txParticipants[id]);
+
+        if (missingIds.length > 0) {
+            boldtrailApi.getTransactionParticipants(missingIds).then(res => {
+                setTxParticipants(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    for (const [txIdStr, pUsers] of Object.entries(res)) {
+                        if ((pUsers as any).error === 429) continue;
+                        const txId = parseInt(txIdStr);
+                        const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
+                        const targets = owners.length > 0 ? owners : (pUsers as any[]);
+                        const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
+                        next[txId] = agentIds;
+                        changed = true;
+                    }
+                    if (changed) {
+                        try { localStorage.setItem('bt_tx_parts_v1', JSON.stringify(next)); } catch (e) { }
+                    }
+                    return next;
+                });
+            });
+        }
+    }, [transactions, txParticipants]);
 
     // Reset to page 1 when filters change
     useEffect(() => {
@@ -159,9 +196,20 @@ const TransactionsPage: React.FC = () => {
 
             // Agent filter
             if (agentFilter.length > 0) {
-                const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
-                const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
-                if (!isBuyingAgent && !isListingAgent) return false;
+                const participantIds = txParticipants[tx.id] || [];
+                let hasMatch = false;
+                for (const pid of participantIds) {
+                    const found = agents.find(a => a.id === pid || a.userId === pid);
+                    if (found && agentFilter.includes(String(found.id))) {
+                        hasMatch = true;
+                        break;
+                    }
+                }
+                if (!hasMatch) {
+                    const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
+                    const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
+                    if (!isBuyingAgent && !isListingAgent) return false;
+                }
             }
 
             return true;
@@ -174,13 +222,21 @@ const TransactionsPage: React.FC = () => {
                 let bValue: any = b[sortConfig.key as keyof typeof b];
 
                 if (sortConfig.key === 'agentName') {
-                    const agentIdA = a.buying_side_representer?.id || a.listing_side_representer?.id;
-                    const foundAgentA = agents.find(ag => ag.id === agentIdA);
-                    aValue = foundAgentA ? foundAgentA.name : 'Unknown Agent';
-
-                    const agentIdB = b.buying_side_representer?.id || b.listing_side_representer?.id;
-                    const foundAgentB = agents.find(ag => ag.id === agentIdB);
-                    bValue = foundAgentB ? foundAgentB.name : 'Unknown Agent';
+                    const getSortName = (txObj: any) => {
+                        const pIds = txParticipants[txObj.id] || [];
+                        let fAgent = null;
+                        for (const pid of pIds) {
+                            fAgent = agents.find(a => a.id === pid || a.userId === pid);
+                            if (fAgent) break;
+                        }
+                        if (!fAgent) {
+                            const aId = txObj.buying_side_representer?.id || txObj.listing_side_representer?.id;
+                            fAgent = agents.find(a => a.id === aId || a.userId === aId);
+                        }
+                        return fAgent ? fAgent.name : 'Unknown Agent';
+                    };
+                    aValue = getSortName(a);
+                    bValue = getSortName(b);
                 } else if (sortConfig.key === 'price') {
                     aValue = a.price || a.sales_volume || 0;
                     bValue = b.price || b.sales_volume || 0;
@@ -341,9 +397,20 @@ const TransactionsPage: React.FC = () => {
                                 ) : (
                                     paginatedTransactions.map(tx => {
                                         // Try to find the agent name locally from our fetched agents
-                                        const agentId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
-                                        const foundAgent = agents.find(a => a.id === agentId);
-                                        const agentName = foundAgent ? foundAgent.name : 'Unknown Agent';
+                                        const participantIds = txParticipants[tx.id] || [];
+                                        let foundAgent = null;
+                                        for (const pid of participantIds) {
+                                            foundAgent = agents.find(a => a.id === pid || a.userId === pid);
+                                            if (foundAgent) break;
+                                        }
+
+                                        // Fallback
+                                        if (!foundAgent) {
+                                            const fallbackId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
+                                            foundAgent = agents.find(a => a.id === fallbackId || a.userId === fallbackId);
+                                        }
+
+                                        const agentName = foundAgent ? foundAgent.name : '';
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
@@ -372,15 +439,20 @@ const TransactionsPage: React.FC = () => {
                                                                 alt={agentName}
                                                                 className="w-8 h-8 rounded-full object-cover ring-2 ring-white/10 shrink-0"
                                                                 referrerPolicy="no-referrer"
+                                                                title={agentName}
                                                             />
-                                                        ) : (
-                                                            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-white/10">
-                                                                <span className="text-xs font-medium text-slate-400">
-                                                                    {agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'}
+                                                        ) : agentName ? (
+                                                            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-700 flex items-center justify-center ring-2 ring-white/10" title={agentName}>
+                                                                <span className="text-xs font-semibold text-slate-300">
+                                                                    {agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                                                 </span>
                                                             </div>
+                                                        ) : (
+                                                            <div title="Unknown Agent" className="shrink-0 flex items-center justify-center">
+                                                                <Home size={20} className="text-slate-400" />
+                                                            </div>
                                                         )}
-                                                        <span className="text-slate-300 font-medium whitespace-nowrap">{agentName}</span>
+                                                        <span className="text-slate-300 font-medium whitespace-nowrap">{agentName || 'Unknown Agent'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-300 font-mono text-sm">
