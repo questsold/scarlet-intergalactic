@@ -119,7 +119,7 @@ const ClientPortalPublicView: React.FC = () => {
                     <div className="max-w-md mx-auto bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 mt-8 shadow-2xl">
                         <div className="flex justify-between items-end mb-3">
                             <div>
-                                <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Journey Progress</p>
+                                <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Your Quest</p>
                             </div>
                             <div className="text-2xl font-bold text-brand-green">{progressPercent}%</div>
                         </div>
