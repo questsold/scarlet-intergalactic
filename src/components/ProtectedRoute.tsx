@@ -26,12 +26,27 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
                     try {
                         const docRef = doc(db, 'allowed_users', firebaseUser.email.toLowerCase());
                         const docSnap = await getDoc(docRef);
+                        const emailStr = firebaseUser.email.toLowerCase();
+                        const isFounder = emailStr === 'ali@questsold.com' || emailStr === 'admin@questsold.com';
+
                         if (docSnap.exists()) {
-                            setAccessData(docSnap.data() as UserAccessData);
+                            const existingData = docSnap.data() as UserAccessData;
+                            // If they are a founder but their existing doc says they don't have access, force upgrade them.
+                            if (isFounder && !existingData.hasAccess) {
+                                const upgradedAccess: UserAccessData = {
+                                    ...existingData,
+                                    hasAccess: true,
+                                    role: 'admin',
+                                    name: firebaseUser.displayName || existingData.name || 'Admin'
+                                };
+                                await setDoc(docRef, upgradedAccess);
+                                setAccessData(upgradedAccess);
+                            } else {
+                                setAccessData(existingData);
+                            }
                         } else {
-                            const emailStr = firebaseUser.email.toLowerCase();
                             // Auto-grant the founders so they can access the Settings page and approve others
-                            if (emailStr === 'ali@questsold.com' || emailStr === 'admin@questsold.com') {
+                            if (isFounder) {
                                 const newAccess: UserAccessData = {
                                     hasAccess: true,
                                     role: 'admin',
