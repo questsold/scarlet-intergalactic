@@ -37,7 +37,7 @@ function App() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [directoryPhotos, setDirectoryPhotos] = useState<Record<string, string>>({});
-  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }>>({});
+  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number }>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -280,7 +280,7 @@ function App() {
       const btIdToEmail = new Map<number, string>();
       btUsers.forEach(bu => { if (bu.email) btIdToEmail.set(bu.id, bu.email.toLowerCase()); });
 
-      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }> = {};
+      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number }> = {};
 
       for (const [btIdStr, profile] of Object.entries(btProfiles)) {
         if (!profile) continue;
@@ -294,6 +294,7 @@ function App() {
         const capAmount = profile.goal_amount ? Number(profile.goal_amount) : 12000;
         let anniversaryTs = 0;
         let officeContribution = 0;
+        let agentNet = 0;
 
         let reportRow = null;
         if (reportData && reportData.length > 0) {
@@ -303,6 +304,7 @@ function App() {
         if (reportRow) {
           anniversaryTs = reportRow.anniversary_date || 0;
           officeContribution = Number(reportRow.office_contribution) || 0;
+          agentNet = Number(reportRow.agent_net) || 0;
         } else {
           // Fallback if not in report
           if (profile.anniversary_date) {
@@ -319,7 +321,8 @@ function App() {
         finalCaps[fubId] = {
           capAmount,
           officeContribution,
-          anniversaryTs
+          anniversaryTs,
+          agentNet
         };
       }
 
@@ -876,13 +879,23 @@ function App() {
                     </h3>
                     <p className="text-slate-400 text-xs shadow-sm">Contributions since last anniversary rollover ({annivDateStr})</p>
                   </div>
-                  <div className="flex items-center gap-2 font-semibold">
-                    <span className={caps.officeContribution >= caps.capAmount ? "text-green-400 text-2xl" : "text-blue-400 text-2xl"}>
-                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.officeContribution)}
-                    </span>
-                    <span className="text-slate-500 text-lg">
-                      / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.capAmount)}
-                    </span>
+                  <div className="flex flex-col items-end">
+                    <div className="text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wider backdrop-blur-sm bg-black/30 px-3 py-1 rounded-full border border-white/5 shadow-sm">
+                      YTD Agent Net: <span className="text-green-400 ml-1.5 font-bold text-xs">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.agentNet || 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold">
+                      {caps.officeContribution >= caps.capAmount && (
+                        <div className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded flex items-center font-bold mr-1 border border-green-500/20 uppercase tracking-widest shadow-sm">
+                          Cap Met
+                        </div>
+                      )}
+                      <span className={caps.officeContribution >= caps.capAmount ? "text-green-400 text-2xl" : "text-blue-400 text-2xl"}>
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.min(caps.officeContribution, caps.capAmount))}
+                      </span>
+                      <span className="text-slate-500 text-lg">
+                        / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.capAmount)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
