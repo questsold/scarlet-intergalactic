@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, CheckCircle2, DollarSign, Home, LayoutGrid, List } from 'lucide-react';
 import type { UnifiedDeal } from '../types/unifiedDeal';
@@ -6,6 +7,7 @@ import { isBoldTrailTransaction } from '../types/unifiedDeal';
 import DashboardLayout from '../components/DashboardLayout';
 import TimeframeSelector from '../components/TimeframeSelector';
 import type { Timeframe } from '../utils/timeFilters';
+import { boldtrailApi } from '../services/boldtrailApi';
 
 interface AgentDealsPageState {
     agentName: string;
@@ -71,15 +73,15 @@ const DealCard: React.FC<{ deal: UnifiedDeal; type: 'pending' | 'closed'; agentN
                             onClick={(e) => e.stopPropagation()}
                         >
                             <img src="/brokermint-icon.png" alt="BackOffice" className="w-4 h-4 rounded-[3px] object-cover" />
-                        </a>
-                    </div>
+                        </a >
+                    </div >
                     <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset capitalize ${isPending
                         ? 'bg-yellow-400/10 text-yellow-400 ring-yellow-400/20'
                         : 'bg-green-400/10 text-green-400 ring-green-400/20'
                         }`}>
                         {deal.status === 'pending' ? 'under contract' : deal.status}
                     </span>
-                </div>
+                </div >
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-xs">
                     <div className="flex flex-col gap-1">
                         <span className="text-slate-500 uppercase tracking-wide">Side</span>
@@ -104,7 +106,7 @@ const DealCard: React.FC<{ deal: UnifiedDeal; type: 'pending' | 'closed'; agentN
                         </span>
                     </div>
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -150,6 +152,26 @@ export const AgentDealsPage: React.FC = () => {
     const [customStartDate, setCustomStartDate] = useState<string>(state?.initialCustomStart || '');
     const [customEndDate, setCustomEndDate] = useState<string>(state?.initialCustomEnd || '');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+    const [liveCap, setLiveCap] = useState<{ capAmount: number, officeContribution: number, anniversaryTs: number } | null>(null);
+
+    useEffect(() => {
+        if (state && state.agentName) {
+            boldtrailApi.getCapReport().then(reportData => {
+                const row = reportData.find((r: any) =>
+                    r.agent_name?.toLowerCase() === state.agentName.toLowerCase() ||
+                    (r.email && state.allDeals.length > 0 && r.email.toLowerCase() === (state.allDeals[0] as any)?.agentEmail?.toLowerCase())
+                );
+                if (row) {
+                    setLiveCap({
+                        capAmount: 12000,
+                        officeContribution: Number(row.office_contribution) || 0,
+                        anniversaryTs: row.anniversary_date || 0
+                    });
+                }
+            });
+        }
+    }, [state?.agentName]);
 
     if (!state) {
         return (
@@ -345,8 +367,14 @@ export const AgentDealsPage: React.FC = () => {
                 </div>
 
                 {/* Cap Progress */}
-                {(state.capAmount !== undefined && state.officeContribution !== undefined) && (() => {
-                    const annivDateStr = state.anniversaryTs ? new Date(state.anniversaryTs).toLocaleDateString() : '';
+                {(() => {
+                    const capToUse = (state && state.capAmount !== undefined)
+                        ? { capAmount: state.capAmount, officeContribution: state.officeContribution || 0, anniversaryTs: state.anniversaryTs || 0 }
+                        : liveCap;
+
+                    if (!capToUse) return null;
+
+                    const annivDateStr = capToUse.anniversaryTs ? new Date(capToUse.anniversaryTs).toLocaleDateString() : '';
                     return (
                         <div className="mt-6 glass-card p-5 border border-white/5 rounded-2xl relative overflow-hidden bg-[#1c2336]/60 backdrop-blur-xl">
                             <div className="absolute inset-0 top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
@@ -358,28 +386,28 @@ export const AgentDealsPage: React.FC = () => {
                                     <p className="text-slate-400 text-xs shadow-sm">Contributions since last anniversary rollover {annivDateStr ? `(${annivDateStr})` : ''}</p>
                                 </div>
                                 <div className="flex items-center gap-2 text-sm font-semibold">
-                                    <span className={state.officeContribution >= state.capAmount ? "text-green-400 text-lg" : "text-blue-400 text-lg"}>
-                                        {formatCurrency(state.officeContribution)}
+                                    <span className={capToUse.officeContribution >= capToUse.capAmount ? "text-green-400 text-lg" : "text-blue-400 text-lg"}>
+                                        {formatCurrency(capToUse.officeContribution)}
                                     </span>
                                     <span className="text-slate-500 text-base">
-                                        / {formatCurrency(state.capAmount)}
+                                        / {formatCurrency(capToUse.capAmount)}
                                     </span>
                                 </div>
                             </div>
 
                             <div className="w-full bg-[#0a0f1c] rounded-full h-3 overflow-hidden shadow-inner relative border border-white/5">
-                                <div className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 text-[10px] text-white/50 relative overflow-hidden ${state.officeContribution >= state.capAmount
+                                <div className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 text-[10px] text-white/50 relative overflow-hidden ${capToUse.officeContribution >= capToUse.capAmount
                                     ? 'bg-gradient-to-r from-green-600/50 to-green-400 border border-green-400/50 shadow-[0_0_15px_rgba(74,222,128,0.4)]'
                                     : 'bg-gradient-to-r from-blue-700/50 to-blue-500 border border-blue-400/50 shadow-[0_0_15px_rgba(96,165,250,0.4)]'
                                     }`}
-                                    style={{ width: `${Math.max(1, Math.min(100, (state.officeContribution / state.capAmount) * 100))}%` }}
+                                    style={{ width: `${Math.max(1, Math.min(100, (capToUse.officeContribution / capToUse.capAmount) * 100))}%` }}
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-[200%] animate-[shimmer_2s_infinite]"></div>
                                 </div>
                             </div>
                             <div className="flex justify-between items-center mt-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider">
                                 <span>0%</span>
-                                <span>{Math.round(Math.min(100, (state.officeContribution / state.capAmount) * 100))}%</span>
+                                <span>{Math.round(Math.min(100, (capToUse.officeContribution / capToUse.capAmount) * 100))}%</span>
                             </div>
                         </div>
                     );

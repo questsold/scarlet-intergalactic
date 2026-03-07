@@ -275,7 +275,7 @@ const AgentsPage: React.FC = () => {
 
     return (
         <DashboardLayout>
-            <div className="w-full max-w-6xl mx-auto animate-in fade-in duration-500 pb-12">
+            <div className="w-full animate-in fade-in duration-500 pb-12 px-4">
                 <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-100">Agents Directory</h1>
@@ -342,7 +342,7 @@ const AgentsPage: React.FC = () => {
                                         <thead>
                                             <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                                                 <th className="px-6 py-4">Agent Name</th>
-                                                <th className="px-6 py-4 whitespace-nowrap">Anniv. Date</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
                                                 <th className="px-6 py-4">Email & Phone</th>
                                                 <th className="px-6 py-4 text-right whitespace-nowrap">Sales Volume</th>
                                                 <th className="px-6 py-4 text-right whitespace-nowrap">Agent Net</th>
@@ -393,11 +393,22 @@ const AgentsPage: React.FC = () => {
                                                         <td className="px-6 py-4 text-slate-300 text-sm text-right whitespace-nowrap">
                                                             {capRow ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.agent_net || 0) : '-'}
                                                         </td>
-                                                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
                                                             {capRow ? (
-                                                                <div className="flex flex-col items-end">
-                                                                    <span className="text-brand-green font-medium text-sm">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.office_contribution || 0)}</span>
-                                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider">/ $12,000 Cap</span>
+                                                                <div className="flex flex-col items-start gap-1">
+                                                                    <div className="flex items-center justify-between w-28 text-xs font-semibold">
+                                                                        <span className={(capRow.office_contribution || 0) >= 12000 ? "text-green-400" : "text-blue-400"}>
+                                                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.office_contribution || 0)}
+                                                                        </span>
+                                                                        <span className="text-slate-500">
+                                                                            / $12,000
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="w-28 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                                        <div className={`h-full rounded-full transition-all duration-1000 ${(capRow.office_contribution || 0) >= 12000 ? 'bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]'}`}
+                                                                            style={{ width: `${Math.min(100, ((capRow.office_contribution || 0) / 12000) * 100)}%` }}
+                                                                        ></div>
+                                                                    </div>
                                                                 </div>
                                                             ) : '-'}
                                                         </td>
