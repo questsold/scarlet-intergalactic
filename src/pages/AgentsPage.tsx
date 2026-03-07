@@ -11,6 +11,7 @@ interface FubAgent {
     id: number;
     name: string;
     email?: string;
+    phone?: string;
     status: string;
     picture?: any;
 }
@@ -28,11 +29,17 @@ interface BtProfile {
     phone?: string;
     anniversary_date?: number;
     start_date?: number;
+    birthday?: number;
 }
 
 const formatDate = (ts?: number) => {
     if (!ts) return 'N/A';
     return new Date(ts > 9999999999 ? ts : ts * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const formatBirthday = (ts?: number) => {
+    if (!ts) return '-';
+    return new Date(ts > 9999999999 ? ts : ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
 const getTitleWeight = (title?: string) => {
@@ -57,6 +64,7 @@ const AgentsPage: React.FC = () => {
     const [saving, setSaving] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [emailToBtIdMap, setEmailToBtIdMap] = useState<Record<string, number>>({});
+    const [capReportData, setCapReportData] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -101,6 +109,10 @@ const AgentsPage: React.FC = () => {
                 });
                 setEmailToBtIdMap(emailToBtId);
 
+                // 4. Fetch Cap Report
+                const capReport = await boldtrailApi.getCapReport();
+                setCapReportData(capReport);
+
             } catch (err) {
                 console.error("Error loading settings data:", err);
             } finally {
@@ -133,7 +145,8 @@ const AgentsPage: React.FC = () => {
                             title: profile.title,
                             phone: profile.phone,
                             anniversary_date: profile.anniversary_date,
-                            start_date: profile.start_date
+                            start_date: profile.start_date,
+                            birthday: profile.birthday
                         };
                     }
                 });
@@ -329,10 +342,12 @@ const AgentsPage: React.FC = () => {
                                         <thead>
                                             <tr className="text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                                                 <th className="px-6 py-4">Agent Name</th>
-                                                <th className="px-6 py-4">Title</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Anniv. Date</th>
                                                 <th className="px-6 py-4">Email & Phone</th>
-                                                <th className="px-6 py-4 whitespace-nowrap">Start Date</th>
-                                                <th className="px-6 py-4 whitespace-nowrap">Rollover Date</th>
+                                                <th className="px-6 py-4 text-right whitespace-nowrap">Sales Volume</th>
+                                                <th className="px-6 py-4 text-right whitespace-nowrap">Agent Net</th>
+                                                <th className="px-6 py-4 text-right whitespace-nowrap">Cap Tracker</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Birthday</th>
                                                 <th className="px-6 py-4 text-right">Dashboard Access</th>
                                             </tr>
                                         </thead>
@@ -342,6 +357,7 @@ const AgentsPage: React.FC = () => {
                                                 const dbAccess = emailKey ? accessMap[emailKey] : null;
                                                 const hasAccess = dbAccess?.hasAccess || false;
                                                 const isSaving = saving === emailKey;
+                                                const capRow = emailKey ? capReportData.find(r => r.email?.toLowerCase() === emailKey) : null;
 
                                                 return (
                                                     <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
@@ -356,23 +372,37 @@ const AgentsPage: React.FC = () => {
                                                                         {agent.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                                                     </div>
                                                                 )}
-                                                                {agent.name}
+                                                                <div className="flex flex-col">
+                                                                    <span>{agent.name}</span>
+                                                                    <span className="text-slate-400 text-xs font-normal">{emailKey && btProfiles[emailKey]?.title || <span className="italic">Advisor</span>}</span>
+                                                                </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-4 text-slate-400 text-sm">
-                                                            {emailKey && btProfiles[emailKey]?.title || <span className="text-slate-600 italic">Advisor</span>}
+                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
+                                                            {emailKey && capRow?.anniversary_date ? formatDate(capRow.anniversary_date) : (emailKey && btProfiles[emailKey]?.anniversary_date ? formatDate(btProfiles[emailKey].anniversary_date) : '-')}
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex flex-col">
                                                                 <span className="text-slate-300 text-sm">{agent.email || <span className="text-slate-600 italic">No email</span>}</span>
-                                                                {emailKey && btProfiles[emailKey]?.phone && <span className="text-slate-500 text-xs mt-0.5">{btProfiles[emailKey].phone}</span>}
+                                                                {(emailKey && btProfiles[emailKey]?.phone) ? <span className="text-slate-500 text-xs mt-0.5">{btProfiles[emailKey].phone}</span> : (agent.phone && <span className="text-slate-500 text-xs mt-0.5">{agent.phone}</span>)}
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                            {emailKey && btProfiles[emailKey] ? formatDate(btProfiles[emailKey].start_date) : '-'}
+                                                        <td className="px-6 py-4 text-slate-300 text-sm text-right whitespace-nowrap">
+                                                            {capRow ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.prorated_sales_volume || 0) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-300 text-sm text-right whitespace-nowrap">
+                                                            {capRow ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.agent_net || 0) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                            {capRow ? (
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className="text-brand-green font-medium text-sm">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(capRow.office_contribution || 0)}</span>
+                                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider">/ $12,000 Cap</span>
+                                                                </div>
+                                                            ) : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 text-slate-400 text-sm whitespace-nowrap">
-                                                            {emailKey && btProfiles[emailKey] ? formatDate(btProfiles[emailKey].anniversary_date) : '-'}
+                                                            {emailKey && btProfiles[emailKey]?.birthday ? formatBirthday(btProfiles[emailKey].birthday) : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {agent.email ? (
