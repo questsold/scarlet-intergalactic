@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../services/firebase';
 import { clientPortalService } from '../services/clientPortalService';
+import { searchPeopleByEmail } from '../services/fubApi';
 
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -43,6 +44,44 @@ const TransactionsPage: React.FC = () => {
 
     // Sort logic
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
+    const [fetchingClientInfo, setFetchingClientInfo] = useState(false);
+
+    const handleOpenPortalModal = async (tx: BoldTrailTransaction) => {
+        setPortalModalOpen(true);
+        setSelectedTxForPortal(tx);
+        setPortalClientName('');
+        setFetchingClientInfo(true);
+
+        try {
+            // Replicate discovery logic to find name via FUB based on email matched in BackOffice contacts
+            const participantsMap = await boldtrailApi.getTransactionParticipants([tx.id]);
+            const participants = participantsMap[tx.id] || [];
+            // Look for buyer, seller or "Under Contract" contact
+            let matchedContact = participants.find((p: any) => p.type === 'contact' &&
+                (p.role === 'Buyer' || p.role === 'Seller' || p.role === 'Under Contract'));
+
+            if (!matchedContact) {
+                matchedContact = participants.find((p: any) => p.type === 'contact');
+            }
+
+            if (matchedContact && matchedContact.email) {
+                const fubResults = await searchPeopleByEmail(matchedContact.email);
+                const fubContact: any = fubResults?.people?.[0]; // Get top match
+
+                if (fubContact && fubContact.name) {
+                    setPortalClientName(fubContact.name);
+                } else if (matchedContact.name || matchedContact.first_name) {
+                    setPortalClientName(matchedContact.name || matchedContact.first_name);
+                }
+            } else if (matchedContact && (matchedContact.name || matchedContact.first_name)) {
+                setPortalClientName(matchedContact.name || matchedContact.first_name);
+            }
+        } catch (e) {
+            console.error("Failed to fetch FUB client info automatically:", e);
+        } finally {
+            setFetchingClientInfo(false);
+        }
+    };
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -476,8 +515,7 @@ const TransactionsPage: React.FC = () => {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setSelectedTxForPortal(tx);
-                                                            setPortalModalOpen(true);
+                                                            handleOpenPortalModal(tx);
                                                         }}
                                                         className="p-1.5 rounded-md hover:bg-brand-green/20 text-brand-green transition-colors focus:ring-2 focus:ring-brand-green/50 flex items-center gap-1 text-sm bg-brand-green/10 border border-brand-green/20"
                                                         title="Create Client Portal"
@@ -598,15 +636,24 @@ const TransactionsPage: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Client Name <span className="text-red-400">*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={portalClientName}
-                                    onChange={(e) => setPortalClientName(e.target.value)}
-                                    placeholder="e.g. John & Jane Doe"
-                                    className="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
-                                    autoFocus
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={portalClientName}
+                                        onChange={(e) => setPortalClientName(e.target.value)}
+                                        placeholder="e.g. John & Jane Doe"
+                                        disabled={fetchingClientInfo}
+                                        className="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium disabled:opacity-50"
+                                        autoFocus
+                                    />
+                                    {fetchingClientInfo && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center gap-2 text-xs">
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Searching FUB...</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <p className="text-xs text-slate-500 mt-2">This name will be displayed at the top of their portal.</p>
                             </div>
                             <div className="pt-2 flex gap-3">
