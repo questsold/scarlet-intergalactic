@@ -1,10 +1,21 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
-import { Shield, Key, Bell, CreditCard, Puzzle } from 'lucide-react';
+import { Shield, Key, Bell, CreditCard, Puzzle, Users } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
+    const navigate = useNavigate();
+
     // Placeholder cards for future settings
     const settingsCards = [
+        {
+            title: "Agents Directory",
+            description: "Manage all agents, their dashboard access, and sync BackOffice data.",
+            icon: Users,
+            color: "text-brand-green",
+            bg: "bg-brand-green/10",
+            path: "/agents"
+        },
         {
             title: "Notification Preferences",
             description: "Control how and when you receive alerts from the platform.",
@@ -54,7 +65,7 @@ const SettingsPage: React.FC = () => {
                     {settingsCards.map((card, i) => {
                         const Icon = card.icon;
                         return (
-                            <div key={i} className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl p-6 hover:bg-[#20283e] hover:border-white/10 transition-all cursor-pointer group">
+                            <div key={i} onClick={() => { if (card.path) navigate(card.path); }} className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl p-6 hover:bg-[#20283e] hover:border-white/10 transition-all cursor-pointer group">
                                 <div className={`w-12 h-12 rounded-xl ${card.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                                     <Icon className={card.color} size={24} />
                                 </div>

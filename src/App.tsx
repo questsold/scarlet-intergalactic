@@ -75,7 +75,10 @@ function App() {
           fetchAllDeals(),
           boldtrailApi.getTransactions(),
           boldtrailApi.getUsers(),
-          getDocs(collection(db, 'allowed_users'))
+          getDocs(collection(db, 'allowed_users')).catch((err) => {
+            console.warn("Insufficient permissions for allowed_users, bypassing dashboard avatars:", err);
+            return { forEach: () => { } };
+          })
         ]);
         setPeople(peopleResponse.people || []);
         setUsers(usersResponse.users || []);

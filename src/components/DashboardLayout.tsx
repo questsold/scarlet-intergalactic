@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, FileSpreadsheet, Clock } from 'lucide-react';
+import { Settings, LogOut, Menu, LayoutDashboard, BarChart3, Megaphone, FileSpreadsheet, Clock } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -43,7 +43,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
         { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { name: 'Transactions', icon: FileSpreadsheet, path: '/transactions' },
         { name: 'Client Portals', icon: Clock, path: '/portals' },
-        { name: 'Agents', icon: Users, path: '/agents' },
         { name: 'Reports', icon: BarChart3, path: '/reports' },
         { name: 'Marketing', icon: Megaphone, path: '/marketing' },
     ];
