@@ -622,12 +622,19 @@ function App() {
               const comms = txCommissions[tx.id];
               prod.closedDeals += 1;
               prod.volume += (tx.price || 0) / btAgentIds.length;
-              prod.officeContributionTimeframe = (prod.officeContributionTimeframe || 0) + (comms ? comms.officeContribution / btAgentIds.length : 0);
+              prod.officeContributionTimeframe = (prod.officeContributionTimeframe || 0) + (comms ? comms.officeNet / btAgentIds.length : 0);
             }
           }
         }
       }
     });
+
+    // Enforce exact match for "This Year" timeframe to align calendar YTD strictly with Cap YTD visually per business requirement
+    if (timeframe === 'This Year') {
+      for (const prod of prodMap.values()) {
+        prod.officeContributionTimeframe = prod.officeContribution || 0;
+      }
+    }
 
     return {
       filteredTransactions,
