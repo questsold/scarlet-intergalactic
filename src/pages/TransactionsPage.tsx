@@ -14,6 +14,7 @@ import { searchPeopleByEmail } from '../services/fubApi';
 
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
     const [agents, setAgents] = useState<{ id: number; userId?: number; name: string; email?: string; avatarUrl?: string }[]>([]);
 
@@ -221,6 +222,8 @@ const TransactionsPage: React.FC = () => {
                         } else {
                             if (authUser.email.toLowerCase() === 'ali@questsold.com' || authUser.email.toLowerCase() === 'admin@questsold.com') isFullAdmin = true;
                         }
+
+                        setIsAdmin(isFullAdmin);
 
                         if (!isFullAdmin) {
                             const myFubAcc = fubAgents.find((fa: any) => fa.email?.toLowerCase() === authUser.email!.toLowerCase());
@@ -460,14 +463,16 @@ const TransactionsPage: React.FC = () => {
                     </div>
 
                     {/* Agent Filter */}
-                    <div className="md:w-64">
-                        <MultiSelect
-                            options={agents.map(a => ({ label: a.name, value: String(a.id) }))}
-                            selectedValues={agentFilter}
-                            onChange={setAgentFilter}
-                            placeholder="All Agents"
-                        />
-                    </div>
+                    {isAdmin && (
+                        <div className="md:w-64">
+                            <MultiSelect
+                                options={agents.map(a => ({ label: a.name, value: String(a.id) }))}
+                                selectedValues={agentFilter}
+                                onChange={setAgentFilter}
+                                placeholder="All Agents"
+                            />
+                        </div>
+                    )}
 
                     {/* Clear Filters Button */}
                     <button
