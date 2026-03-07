@@ -108,13 +108,74 @@ function App() {
   }, []);
 
   const LOCAL_STORAGE_KEY = 'bt_tx_parts_v1';
-  const [txParticipants] = useState<Record<number, number[]>>(() => {
+  const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) return JSON.parse(cached);
     } catch (e) { }
     return {};
   });
+
+  // Background hydration for missing transactions
+  useEffect(() => {
+    if (transactions.length === 0) return;
+
+    // Only hydrate recent deals (this year and last year) to avoid hitting API rate limits
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    const relevantTxs = transactions.filter(tx => {
+      const d1 = tx.closing_date ? new Date(tx.closing_date).getFullYear() : 0;
+      const d2 = tx.acceptance_date ? new Date(tx.acceptance_date).getFullYear() : 0;
+      const d3 = tx.created_at ? new Date(tx.created_at).getFullYear() : 0;
+      return (d1 >= currentYear - 1) || (d2 >= currentYear - 1) || (d3 >= currentYear - 1);
+    });
+
+    const missingIds = relevantTxs.map(tx => tx.id).filter(id => !txParticipants[id]);
+    if (missingIds.length === 0) return;
+
+    let isMounted = true;
+    const fetchMissing = async () => {
+      const chunkSize = 50;
+      for (let i = 0; i < missingIds.length; i += chunkSize) {
+        if (!isMounted) break;
+        const chunk = missingIds.slice(i, i + chunkSize);
+        try {
+          const res = await boldtrailApi.getTransactionParticipants(chunk);
+          if (!isMounted) break;
+
+          setTxParticipants(prev => {
+            const next = { ...prev };
+            let changed = false;
+            for (const [txIdStr, pUsers] of Object.entries(res)) {
+              if ((pUsers as any).error === 429) continue; // rate limited
+              const txId = parseInt(txIdStr);
+              const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
+              const targets = owners.length > 0 ? owners : (pUsers as any[]);
+              const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
+              next[txId] = agentIds;
+              changed = true;
+            }
+            if (changed) {
+              try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next)); } catch (e) { }
+            }
+            return next;
+          });
+        } catch (e) {
+          console.error("Participant fetch error", e);
+        }
+
+        // 1.5 second delay between batches to respect Brokermint's API rate limits
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    };
+
+    fetchMissing();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [transactions]);
 
   // --- Cap Calculation ---
   useEffect(() => {
