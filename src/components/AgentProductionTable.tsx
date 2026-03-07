@@ -61,7 +61,7 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
 
     return (
         <div className="glass-card shadow-lg flex flex-col w-full animate-in fade-in duration-500 delay-100 overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex items-center justify-center">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                     <h2 className="text-xl font-bold text-slate-200">Agent Production</h2>
                 </div>

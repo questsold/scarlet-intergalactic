@@ -1,5 +1,4 @@
 import React from 'react';
-import { Trophy } from 'lucide-react';
 
 interface Producer {
     name: string;
@@ -17,9 +16,8 @@ interface TopProducersProps {
 const TopProducers: React.FC<TopProducersProps> = ({ producers, title, onAgentClick }) => {
     return (
         <div className="glass-card flex flex-col items-center bg-[#1c2336] border border-white/5 rounded-2xl p-6 pb-12 relative w-full shrink-0 h-full">
-            <div className="w-full mb-6 flex items-center justify-center gap-2 relative z-10">
+            <div className="w-full mb-6 flex items-center gap-2 relative z-10">
                 <h2 className="text-xl font-bold text-slate-100">{title}</h2>
-                <Trophy size={18} className="text-brand-green fill-brand-green" />
             </div>
 
             <div className="flex flex-wrap justify-center gap-6 md:gap-8 w-full relative z-10 mt-4">
