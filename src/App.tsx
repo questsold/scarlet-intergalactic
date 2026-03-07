@@ -247,8 +247,8 @@ function App() {
   // IMPORTANT: Closed and pending deals are counted by when the deal *entered that stage* (enteredStageAt),
   // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
   // but closed in February should count toward February's closed total.
-  const { productionTableData, dashboardKpis } = useMemo(() => {
-    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], cancelledTotalYTD: [], closed: [], closedTotalYTD: [] } };
+  const { filteredTransactions, productionTableData, dashboardKpis } = useMemo(() => {
+    if (users.length === 0 || isAdmin === null) return { productionTableData: [], filteredTransactions: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], cancelledTotalYTD: [], closed: [], closedTotalYTD: [] } };
 
     // Determine if we should filter the global dashboard down to just the currently logged-in Agent
     let authFubUserId: number | null = null;
@@ -344,6 +344,7 @@ function App() {
     const cancelledTotalYTD: UnifiedDeal[] = [];
     const closed: UnifiedDeal[] = [];
     const closedTotalYTD: UnifiedDeal[] = [];
+    const filteredTransactions: UnifiedDeal[] = [];
 
     const btIdToNameMap = new Map<number, string>();
     const btIdToEmailMap = new Map<number, string>();
@@ -382,6 +383,11 @@ function App() {
           if (agentEmail && emailToFubUserId.get(agentEmail) === authFubUserId) { belongsToAgent = true; break; }
           if (agentName && nameToFubUserId.get(agentName.toLowerCase()) === authFubUserId) { belongsToAgent = true; break; }
         }
+      }
+
+      // Add to overall user-visible transactions
+      if (belongsToAgent) {
+        filteredTransactions.push(tx);
       }
 
       // 1. Active Listings (from BoldTrail representing seller/both)
@@ -483,6 +489,7 @@ function App() {
     });
 
     return {
+      filteredTransactions,
       productionTableData: Array.from(prodMap.values()),
       dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, cancelledTotalYTD, closed, closedTotalYTD }
     };
@@ -586,7 +593,7 @@ function App() {
       state: {
         title,
         deals: kpiDeals,
-        allTransactions: transactions,
+        allTransactions: filteredTransactions,
         initialTimeframe: timeframe,
         initialCustomStart: customStartDate,
         initialCustomEnd: customEndDate
