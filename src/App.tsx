@@ -248,7 +248,7 @@ function App() {
   // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
   // but closed in February should count toward February's closed total.
   const { productionTableData, dashboardKpis } = useMemo(() => {
-    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], underContract: [], cancelled: [], closed: [] } };
+    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], closed: [] } };
 
     // Determine if we should filter the global dashboard down to just the currently logged-in Agent
     let authFubUserId: number | null = null;
@@ -337,7 +337,9 @@ function App() {
     });
 
     const activeListings: UnifiedDeal[] = [];
+    const activeListingsTotal: UnifiedDeal[] = [];
     const underContract: UnifiedDeal[] = [];
+    const underContractTotal: UnifiedDeal[] = [];
     const cancelled: UnifiedDeal[] = [];
     const closed: UnifiedDeal[] = [];
 
@@ -382,7 +384,11 @@ function App() {
 
       // 1. Active Listings (from BoldTrail representing seller/both)
       if (belongsToAgent && tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        activeListings.push(tx);
+        activeListingsTotal.push(tx);
+        const listDateStr = tx.listing_date || tx.created_at || tx.updated_at;
+        if (timeframe === 'All Time' || inRange(listDateStr)) {
+          activeListings.push(tx);
+        }
       }
 
       const contractDateStr = tx.acceptance_date || tx.created_at;
@@ -394,6 +400,10 @@ function App() {
       const closeDateStr = tx.closing_date;
       const isClosedState = tx.status === 'closed';
       const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
+
+      if (belongsToAgent && tx.status === 'pending') {
+        underContractTotal.push(tx);
+      }
 
       if (isWritten && isValidWrittenStatus) {
         if (belongsToAgent) underContract.push(tx);
@@ -460,7 +470,7 @@ function App() {
 
     return {
       productionTableData: Array.from(prodMap.values()),
-      dashboardKpis: { activeListings, underContract, cancelled, closed }
+      dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, closed }
     };
   }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin, directoryPhotos, agentCaps]);
 
@@ -614,22 +624,38 @@ function App() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in fade-in duration-500 mb-6">
         <div
           onClick={() => handleKpiClick("Active Listings", dashboardKpis.activeListings)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
+          className="glass-card p-6 flex flex-col justify-between bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
         >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Active Listings</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Total current listings</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-white tracking-tight">{dashboardKpis.activeListings.length}</span>
+          <div className="flex w-full items-center justify-between">
+            <h3 className="text-slate-200 font-bold text-lg group-hover:text-white transition-colors">Active Listings</h3>
+          </div>
+          <div className="flex-1 flex items-end justify-between w-full pt-4">
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-4xl font-bold text-white tracking-tight leading-none">{dashboardKpis.activeListings.length}</span>
+              <span className="text-slate-400 text-xs">Total in time frame.</span>
+            </div>
+            <div className="flex flex-col items-end gap-1 pb-1">
+              <span className="text-2xl font-bold text-white/50 tracking-tight leading-none">{dashboardKpis.activeListingsTotal.length}</span>
+              <span className="text-slate-500 text-[10px] uppercase font-semibold tracking-wider">Total current listings</span>
+            </div>
           </div>
         </div>
         <div
           onClick={() => handleKpiClick("Under Contract", dashboardKpis.underContract)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
+          className="glass-card p-6 flex flex-col justify-between bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
         >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Under Contract</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Total in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-brand-green tracking-tight">{dashboardKpis.underContract.length}</span>
+          <div className="flex w-full items-center justify-between">
+            <h3 className="text-slate-200 font-bold text-lg group-hover:text-white transition-colors">Under Contract</h3>
+          </div>
+          <div className="flex-1 flex items-end justify-between w-full pt-4">
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-4xl font-bold text-brand-green tracking-tight leading-none">{dashboardKpis.underContract.length}</span>
+              <span className="text-slate-400 text-xs">Total in time frame.</span>
+            </div>
+            <div className="flex flex-col items-end gap-1 pb-1">
+              <span className="text-2xl font-bold text-brand-green/50 tracking-tight leading-none">{dashboardKpis.underContractTotal.length}</span>
+              <span className="text-slate-500 text-[10px] uppercase font-semibold tracking-wider">Total current U/C</span>
+            </div>
           </div>
         </div>
         <div
