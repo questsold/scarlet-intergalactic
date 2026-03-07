@@ -248,7 +248,7 @@ function App() {
   // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
   // but closed in February should count toward February's closed total.
   const { productionTableData, dashboardKpis } = useMemo(() => {
-    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], closed: [] } };
+    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], closed: [], closedTotalYTD: [] } };
 
     // Determine if we should filter the global dashboard down to just the currently logged-in Agent
     let authFubUserId: number | null = null;
@@ -342,6 +342,7 @@ function App() {
     const underContractTotal: UnifiedDeal[] = [];
     const cancelled: UnifiedDeal[] = [];
     const closed: UnifiedDeal[] = [];
+    const closedTotalYTD: UnifiedDeal[] = [];
 
     const btIdToNameMap = new Map<number, string>();
     const btIdToEmailMap = new Map<number, string>();
@@ -419,6 +420,12 @@ function App() {
       if (isClosed) {
         if (belongsToAgent) closed.push(tx);
       }
+      if (isClosedState && belongsToAgent && closeDateStr) {
+        const d = new Date(closeDateStr);
+        if (d.getFullYear() === now.getFullYear()) {
+          closedTotalYTD.push(tx);
+        }
+      }
 
       // Map agent production
       let btAgentIds = txParticipants[tx.id];
@@ -470,7 +477,7 @@ function App() {
 
     return {
       productionTableData: Array.from(prodMap.values()),
-      dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, closed }
+      dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, closed, closedTotalYTD }
     };
   }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin, directoryPhotos, agentCaps]);
 
@@ -670,12 +677,20 @@ function App() {
         </div>
         <div
           onClick={() => handleKpiClick("Closed Deals", dashboardKpis.closed)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
+          className="glass-card p-6 flex flex-col justify-between bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
         >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Closed</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Closed in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-green-400 tracking-tight">{dashboardKpis.closed.length}</span>
+          <div className="flex w-full items-center justify-between">
+            <h3 className="text-slate-200 font-bold text-lg group-hover:text-white transition-colors">Closed</h3>
+          </div>
+          <div className="flex-1 flex items-end justify-between w-full pt-4">
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-4xl font-bold text-green-400 tracking-tight leading-none">{dashboardKpis.closed.length}</span>
+              <span className="text-slate-400 text-xs">Closed in timeframe.</span>
+            </div>
+            <div className="flex flex-col items-end gap-1 pb-1">
+              <span className="text-2xl font-bold text-green-400/50 tracking-tight leading-none">{dashboardKpis.closedTotalYTD.length}</span>
+              <span className="text-slate-500 text-[10px] uppercase font-semibold tracking-wider">Total closed YTD</span>
+            </div>
           </div>
         </div>
       </div>
