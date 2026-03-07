@@ -120,15 +120,22 @@ function App() {
   useEffect(() => {
     if (transactions.length === 0) return;
 
-    // Only hydrate recent deals (this year and last year) to avoid hitting API rate limits
+    // Only hydrate recent deals (strictly THIS year) to avoid hitting Brokermint's 200 request/minute API rate limits
     const now = new Date();
     const currentYear = now.getFullYear();
 
     const relevantTxs = transactions.filter(tx => {
       const d1 = tx.closing_date ? new Date(tx.closing_date).getFullYear() : 0;
       const d2 = tx.acceptance_date ? new Date(tx.acceptance_date).getFullYear() : 0;
-      const d3 = tx.created_at ? new Date(tx.created_at).getFullYear() : 0;
-      return (d1 >= currentYear - 1) || (d2 >= currentYear - 1) || (d3 >= currentYear - 1);
+
+      // Strict mapping: Dashboard defaults to "This Year" (2026).
+      // Only fetch deals that actually impact the leaderboard or KPIs for "This Year".
+      const impactsThisYear = (d1 === currentYear || d2 === currentYear);
+      const isImportantStatus = ['closed', 'pending', 'listing'].includes(tx.status);
+
+      const hasBrokerageAccountOverride = tx.buying_side_representer?.id === 2750 || tx.listing_side_representer?.id === 2750;
+
+      return impactsThisYear && isImportantStatus && hasBrokerageAccountOverride;
     });
 
     const missingIds = relevantTxs.map(tx => tx.id).filter(id => !txParticipants[id]);
@@ -136,7 +143,9 @@ function App() {
 
     let isMounted = true;
     const fetchMissing = async () => {
-      const chunkSize = 50;
+      // EXTREMELY conservative chunking. Vercel will fan-out these requests to Brokermint.
+      // Brokermint limits to 200req/min. We will send 10 at a time, every 3.5 seconds. (~170req/min theoretical max)
+      const chunkSize = 10;
       for (let i = 0; i < missingIds.length; i += chunkSize) {
         if (!isMounted) break;
         const chunk = missingIds.slice(i, i + chunkSize);
@@ -165,15 +174,17 @@ function App() {
           console.error("Participant fetch error", e);
         }
 
-        // 1.5 second delay between batches to respect Brokermint's API rate limits
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // 3.5 second delay between batches to respect Brokermint's API rate limits
+        await new Promise(resolve => setTimeout(resolve, 3500));
       }
     };
 
-    fetchMissing();
+    // Delay the start of background fetch by 10 seconds to allow core API requests (transactions, users) to finish untouched.
+    const timeoutId = setTimeout(fetchMissing, 10000);
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
     };
   }, [transactions]);
 
