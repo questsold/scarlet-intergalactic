@@ -291,7 +291,13 @@ export const clientPortalService = {
             milestones: milestones
         };
 
-        await setDoc(portalRef, portal);
+        // Firebase Firestore does not support undefined values.
+        // Strip out any undefined properties from the object wrapper.
+        const cleanPortal = Object.fromEntries(
+            Object.entries(portal).filter(([_, v]) => v !== undefined)
+        ) as ClientPortal;
+
+        await setDoc(portalRef, cleanPortal);
         return portalRef.id;
     },
 
