@@ -14,6 +14,8 @@ interface AgentDealsPageState {
     initialTimeframe: Timeframe;
     initialCustomStart: string;
     initialCustomEnd: string;
+    capAmount?: number;
+    officeContribution?: number;
 }
 
 // We no longer strictly filter by PENDING_STAGES because 'Written' means it was signed in the timeframe.
@@ -340,6 +342,44 @@ export const AgentDealsPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Cap Progress */}
+                {(state.capAmount !== undefined && state.officeContribution !== undefined) && (
+                    <div className="mt-6 glass-card p-5 border border-white/5 rounded-2xl relative overflow-hidden bg-[#1c2336]/60 backdrop-blur-xl">
+                        <div className="absolute inset-0 top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+                            <div>
+                                <h3 className="text-slate-200 font-bold mb-0.5 flex items-center gap-2">
+                                    <DollarSign size={16} className="text-brand-green" /> Office Cap Progress
+                                </h3>
+                                <p className="text-slate-400 text-xs shadow-sm">Contributions since last anniversary rollover</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                                <span className={state.officeContribution >= state.capAmount ? "text-green-400 text-lg" : "text-blue-400 text-lg"}>
+                                    {formatCurrency(state.officeContribution)}
+                                </span>
+                                <span className="text-slate-500 text-base">
+                                    / {formatCurrency(state.capAmount)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="w-full bg-[#0a0f1c] rounded-full h-3 overflow-hidden shadow-inner relative border border-white/5">
+                            <div className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 text-[10px] text-white/50 relative overflow-hidden ${state.officeContribution >= state.capAmount
+                                    ? 'bg-gradient-to-r from-green-600/50 to-green-400 border border-green-400/50 shadow-[0_0_15px_rgba(74,222,128,0.4)]'
+                                    : 'bg-gradient-to-r from-blue-700/50 to-blue-500 border border-blue-400/50 shadow-[0_0_15px_rgba(96,165,250,0.4)]'
+                                }`}
+                                style={{ width: `${Math.max(1, Math.min(100, (state.officeContribution / state.capAmount) * 100))}%` }}
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-[200%] animate-[shimmer_2s_infinite]"></div>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center mt-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                            <span>0%</span>
+                            <span>{Math.round(Math.min(100, (state.officeContribution / state.capAmount) * 100))}%</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Deals Grid */}

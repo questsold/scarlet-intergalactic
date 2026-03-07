@@ -52,7 +52,8 @@ export default async function handler(req, res) {
                             title: data.Title || data.title,
                             phone: data.phone,
                             anniversary_date: data.anniversary_date,
-                            start_date: data.created_at
+                            start_date: data.created_at,
+                            goal_amount: data["Goal amount"] || 12000
                         };
                     } else if (response.status === 429) {
                         results[id] = { error: 429 };
