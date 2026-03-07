@@ -46,11 +46,17 @@ const TransactionsPage: React.FC = () => {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
     const [fetchingClientInfo, setFetchingClientInfo] = useState(false);
 
+    // Store resolved FUB and BT contacts to carry over all data into "createManualPortal"
+    const [fetchedFubContact, setFetchedFubContact] = useState<any>(null);
+    const [fetchedBtContact, setFetchedBtContact] = useState<any>(null);
+
     const handleOpenPortalModal = async (tx: BoldTrailTransaction) => {
         setPortalModalOpen(true);
         setSelectedTxForPortal(tx);
         setPortalClientName('');
         setFetchingClientInfo(true);
+        setFetchedFubContact(null);
+        setFetchedBtContact(null);
 
         try {
             // Replicate discovery logic to find name via FUB based on email matched in BackOffice contacts
@@ -64,17 +70,25 @@ const TransactionsPage: React.FC = () => {
                 matchedContact = participants.find((p: any) => p.type === 'contact');
             }
 
-            if (matchedContact && matchedContact.email) {
-                const fubResults = await searchPeopleByEmail(matchedContact.email);
-                const fubContact: any = fubResults?.people?.[0]; // Get top match
+            if (matchedContact) {
+                setFetchedBtContact(matchedContact);
+                if (matchedContact.email) {
+                    const fubResults = await searchPeopleByEmail(matchedContact.email);
+                    const fubContact: any = fubResults?.people?.[0]; // Get top match
 
-                if (fubContact && fubContact.name) {
-                    setPortalClientName(fubContact.name);
+                    if (fubContact) {
+                        setFetchedFubContact(fubContact);
+                        if (fubContact.name) {
+                            setPortalClientName(fubContact.name);
+                        } else if (matchedContact.name || matchedContact.first_name) {
+                            setPortalClientName(matchedContact.name || matchedContact.first_name);
+                        }
+                    } else if (matchedContact.name || matchedContact.first_name) {
+                        setPortalClientName(matchedContact.name || matchedContact.first_name);
+                    }
                 } else if (matchedContact.name || matchedContact.first_name) {
                     setPortalClientName(matchedContact.name || matchedContact.first_name);
                 }
-            } else if (matchedContact && (matchedContact.name || matchedContact.first_name)) {
-                setPortalClientName(matchedContact.name || matchedContact.first_name);
             }
         } catch (e) {
             console.error("Failed to fetch FUB client info automatically:", e);
@@ -97,14 +111,53 @@ const TransactionsPage: React.FC = () => {
 
         setCreatingPortal(true);
         try {
-            const portalId = await clientPortalService.createPortalFromTransaction(
-                selectedTxForPortal,
+            // Reconstruct full details for createManualPortal
+            let portalAgentEmail = authUser.email;
+            let portalAgentName = undefined;
+            let portalAgentPhotoUrl = undefined;
+            let questStartDate = undefined;
+
+            if (fetchedFubContact) {
+                if (fetchedFubContact.created) {
+                    questStartDate = new Date(fetchedFubContact.created).getTime();
+                }
+
+                if (fetchedFubContact.assignedUserId) {
+                    const assUser = fetchedFubContact.assignedUser || (fetchedFubContact.users && fetchedFubContact.users[0]);
+                    if (assUser && assUser.email) {
+                        portalAgentEmail = assUser.email;
+                        portalAgentName = assUser.name;
+                        portalAgentPhotoUrl = assUser.picture ? (assUser.picture["162x162"] || assUser.picture["60x60"] || assUser.picture.original) : undefined;
+                    } else if (fetchedFubContact.assignedTo) {
+                        portalAgentName = fetchedFubContact.assignedTo;
+                    }
+                }
+            }
+
+            const clientEmail = fetchedFubContact?.emails?.[0]?.value || fetchedBtContact?.email;
+            const clientPhone = fetchedFubContact?.phones?.[0]?.value || '';
+            const clientType = (selectedTxForPortal.representing === 'seller' || fetchedBtContact?.role === 'Seller') ? 'seller' : 'buyer';
+            const fubStage = fetchedFubContact?.stage;
+
+            const portalId = await clientPortalService.createManualPortal(
                 portalClientName.trim(),
-                authUser.email
+                selectedTxForPortal.address || 'TBD Address',
+                portalAgentEmail,
+                questStartDate,
+                clientEmail,
+                clientPhone,
+                clientType,
+                portalAgentName,
+                portalAgentPhotoUrl,
+                fubStage,
+                selectedTxForPortal
             );
+
             setPortalModalOpen(false);
             setPortalClientName('');
             setSelectedTxForPortal(null);
+            setFetchedFubContact(null);
+            setFetchedBtContact(null);
             navigate(`/portals/${portalId}`);
         } catch (error: any) {
             console.error("Error creating portal:", error);

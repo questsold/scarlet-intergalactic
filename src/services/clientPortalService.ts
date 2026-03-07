@@ -115,7 +115,7 @@ export const clientPortalService = {
         const getDateFromAttr = (nameRegex: RegExp): number | null => {
             if (!transaction?.custom_attributes) return null;
             const attr = transaction.custom_attributes.find(a =>
-                nameRegex.test((a.name || a.label || '').toLowerCase())
+                nameRegex.test((a.name || '').toLowerCase()) || nameRegex.test((a.label || '').toLowerCase())
             );
             if (attr && attr.value) {
                 const parsed = new Date(attr.value).getTime();
