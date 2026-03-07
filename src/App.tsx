@@ -107,6 +107,15 @@ function App() {
     loadData();
   }, []);
 
+  const LOCAL_STORAGE_KEY_COMMS = 'bt_tx_comms_v1';
+  const [txCommissions, setTxCommissions] = useState<Record<number, { officeNet: number, officeContribution: number, agentNet: number }>>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY_COMMS);
+      if (cached) return JSON.parse(cached);
+    } catch (e) { }
+    return {};
+  });
+
   const LOCAL_STORAGE_KEY = 'bt_tx_parts_v1';
   const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
     try {
@@ -181,6 +190,61 @@ function App() {
 
     // Delay the start of background fetch by 10 seconds to allow core API requests (transactions, users) to finish untouched.
     const timeoutId = setTimeout(fetchMissing, 10000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [transactions]);
+
+  // Background hydration for missing commissions
+  useEffect(() => {
+    if (transactions.length === 0) return;
+
+    // Only hydrate recent deals (strictly THIS year)
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    const relevantTxs = transactions.filter(tx => {
+      const d1 = tx.closing_date ? new Date(tx.closing_date).getFullYear() : 0;
+      const d2 = tx.acceptance_date ? new Date(tx.acceptance_date).getFullYear() : 0;
+
+      const impactsThisYear = (d1 === currentYear || d2 === currentYear);
+      const isImportantStatus = ['closed', 'pending'].includes(tx.status);
+
+      return impactsThisYear && isImportantStatus;
+    });
+
+    const missingIds = relevantTxs.map(tx => tx.id).filter(id => !txCommissions[id]);
+    if (missingIds.length === 0) return;
+
+    let isMounted = true;
+    const fetchMissing = async () => {
+      // Fetch 10 deals at a time
+      const chunkSize = 10;
+      for (let i = 0; i < missingIds.length; i += chunkSize) {
+        if (!isMounted) break;
+        const chunk = missingIds.slice(i, i + chunkSize);
+        try {
+          const res = await boldtrailApi.getTransactionCommissions(chunk);
+          if (!isMounted) break;
+
+          setTxCommissions(prev => {
+            const next = { ...prev, ...res };
+            try { localStorage.setItem(LOCAL_STORAGE_KEY_COMMS, JSON.stringify(next)); } catch (e) { }
+            return next;
+          });
+        } catch (e) {
+          console.error("Commission fetch error", e);
+        }
+
+        // Wait a few seconds to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 3500));
+      }
+    };
+
+    // Delay start to allow transactions/participants to settle primarily
+    const timeoutId = setTimeout(fetchMissing, 15000);
 
     return () => {
       isMounted = false;
@@ -552,8 +616,10 @@ function App() {
             const prod = prodMap.get(fubId)!;
             if (isWritten && isValidWrittenStatus) prod.writtenDeals += 1;
             if (isClosed) {
+              const comms = txCommissions[tx.id];
               prod.closedDeals += 1;
               prod.volume += (tx.price || 0) / btAgentIds.length;
+              prod.officeContributionTimeframe = (prod.officeContributionTimeframe || 0) + (comms ? comms.officeContribution / btAgentIds.length : 0);
             }
           }
         }
@@ -565,7 +631,7 @@ function App() {
       productionTableData: Array.from(prodMap.values()),
       dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, cancelledTotalYTD, closed, closedTotalYTD }
     };
-  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin, directoryPhotos, agentCaps]);
+  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, txCommissions, authUser, isAdmin, directoryPhotos, agentCaps]);
 
   // Format data for the TopProducers component
   const topProducersData = useMemo(() => {
