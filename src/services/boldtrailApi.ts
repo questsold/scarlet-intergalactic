@@ -188,6 +188,29 @@ class BoldTrailApi {
     }
 
     /**
+     * Fetches the specific Company Cap Report (Report ID: 775362)
+     */
+    async getCapReport(): Promise<any[]> {
+        try {
+            const response = await fetch('/api/bt-cap-report', {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) {
+                console.error('BoldTrail Cap Report API Error:', response.status);
+                return [];
+            }
+
+            const data = await response.json();
+            return data.data || [];
+        } catch (e) {
+            console.error('Failed to fetch Cap Report', e);
+            return [];
+        }
+    }
+
+    /**
      * Fetches the participants (agents) for a batch of transactions.
      * @param transactionIds Array of BoldTrail transaction IDs (max 200).
      * @returns A map of transactionId to an array of BoldTrailUser.

@@ -119,7 +119,7 @@ function App() {
   // --- Cap Calculation ---
   useEffect(() => {
     const calculateCaps = async () => {
-      if (users.length === 0 || btUsers.length === 0 || transactions.length === 0) return;
+      if (users.length === 0 || btUsers.length === 0) return;
 
       const activeEmails = new Set(
         users.filter(u => u.status === 'Active' && (u.role === 'Owner' || u.role === 'Agent'))
@@ -133,14 +133,18 @@ function App() {
 
       if (targetBtIds.length === 0) return;
 
-      const btProfiles = await boldtrailApi.getUserDetails(targetBtIds);
+      const [btProfiles, reportData] = await Promise.all([
+        boldtrailApi.getUserDetails(targetBtIds),
+        boldtrailApi.getCapReport()
+      ]);
 
-      const fubToCapInfo: Record<number, { btId: number, capAmount: number, anniversaryTs: number }> = {};
       const emailToFubId = new Map<string, number>();
       users.forEach(u => { if (u.email) emailToFubId.set(u.email.toLowerCase(), u.id); });
 
       const btIdToEmail = new Map<number, string>();
       btUsers.forEach(bu => { if (bu.email) btIdToEmail.set(bu.id, bu.email.toLowerCase()); });
+
+      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }> = {};
 
       for (const [btIdStr, profile] of Object.entries(btProfiles)) {
         if (!profile) continue;
@@ -151,85 +155,44 @@ function App() {
         const fubId = emailToFubId.get(email);
         if (!fubId) continue;
 
+        const capAmount = profile.goal_amount ? Number(profile.goal_amount) : 12000;
         let anniversaryTs = 0;
-        if (profile.anniversary_date) {
-          const annivDate = new Date(profile.anniversary_date);
-          const now = new Date();
-          let currentYearAnniv = new Date(now.getFullYear(), annivDate.getMonth(), annivDate.getDate());
-          if (currentYearAnniv > now) {
-            currentYearAnniv = new Date(now.getFullYear() - 1, annivDate.getMonth(), annivDate.getDate());
-          }
-          anniversaryTs = currentYearAnniv.getTime();
+        let officeContribution = 0;
+
+        let reportRow = null;
+        if (reportData && reportData.length > 0) {
+          reportRow = reportData.find((r: any) => r.email?.toLowerCase() === email.toLowerCase());
         }
 
-        fubToCapInfo[fubId] = {
-          btId,
-          capAmount: profile.goal_amount ? Number(profile.goal_amount) : 12000,
+        if (reportRow) {
+          anniversaryTs = reportRow.anniversary_date || 0;
+          officeContribution = Number(reportRow.office_contribution) || 0;
+        } else {
+          // Fallback if not in report
+          if (profile.anniversary_date) {
+            const annivDate = new Date(profile.anniversary_date);
+            const now = new Date();
+            let currentYearAnniv = new Date(now.getFullYear(), annivDate.getMonth(), annivDate.getDate());
+            if (currentYearAnniv > now) {
+              currentYearAnniv = new Date(now.getFullYear() - 1, annivDate.getMonth(), annivDate.getDate());
+            }
+            anniversaryTs = currentYearAnniv.getTime();
+          }
+        }
+
+        finalCaps[fubId] = {
+          capAmount,
+          officeContribution,
           anniversaryTs
         };
       }
-
-      const txToFubIds: Record<number, number[]> = {};
-      const txIdsToFetchCommissions: number[] = [];
-
-      transactions.forEach(tx => {
-        if (tx.status !== 'closed') return;
-        const closeTime = tx.closing_date || tx.closed_at || tx.created_at;
-        if (!closeTime) return;
-
-        let transactionIncluded = false;
-
-        Object.entries(fubToCapInfo).forEach(([fubIdStr, info]) => {
-          const fubId = Number(fubIdStr);
-          if (closeTime >= info.anniversaryTs) {
-            let isParticipant = false;
-            const btPartIds = txParticipants[tx.id] || [];
-            if (btPartIds.includes(info.btId)) isParticipant = true;
-            if (tx.buying_side_representer?.id === info.btId) isParticipant = true;
-            if (tx.listing_side_representer?.id === info.btId) isParticipant = true;
-
-            if (isParticipant) {
-              transactionIncluded = true;
-              if (!txToFubIds[tx.id]) txToFubIds[tx.id] = [];
-              if (!txToFubIds[tx.id].includes(fubId)) txToFubIds[tx.id].push(fubId);
-            }
-          }
-        });
-
-        if (transactionIncluded) {
-          txIdsToFetchCommissions.push(tx.id);
-        }
-      });
-
-      const commissionsMap = await boldtrailApi.getTransactionCommissions(txIdsToFetchCommissions);
-      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }> = {};
-
-      Object.keys(fubToCapInfo).forEach(fubId => {
-        finalCaps[Number(fubId)] = {
-          capAmount: fubToCapInfo[Number(fubId)].capAmount,
-          officeContribution: 0,
-          anniversaryTs: fubToCapInfo[Number(fubId)].anniversaryTs
-        };
-      });
-
-      Object.entries(commissionsMap).forEach(([txIdStr, commInfo]) => {
-        const txId = Number(txIdStr);
-        const fubs = txToFubIds[txId];
-        if (fubs && fubs.length > 0) {
-          const officeNet = (commInfo as any).officeNet || 0;
-          const share = officeNet / fubs.length;
-          fubs.forEach(fubId => {
-            finalCaps[fubId].officeContribution += share;
-          });
-        }
-      });
 
       setAgentCaps(finalCaps);
     };
 
     // Delay calculations so it doesn't block critical screen paints
     setTimeout(() => { calculateCaps(); }, 1500);
-  }, [users, btUsers, transactions, txParticipants]);
+  }, [users, btUsers]);
 
   // --- Data Processing ---
   const filteredPeople = useMemo(() => filterByTimeframe(people, timeframe, customStartDate, customEndDate), [people, timeframe, customStartDate, customEndDate]);
