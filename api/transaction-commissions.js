@@ -51,7 +51,7 @@ export default async function handler(req, res) {
                         let agentNet = 0;
                         if (Array.isArray(data)) {
                             data.forEach(item => {
-                                if (item.item_type === 'OFFICE_NET') {
+                                if (item.item_type === 'COMPANY_DOLLAR_CONTRIBUTION') {
                                     officeNet += item.calculated_dollar_amount || 0;
                                 } else if (item.item_type === 'AGENT_COMMISSIONS') {
                                     agentNet += item.calculated_dollar_amount || 0;

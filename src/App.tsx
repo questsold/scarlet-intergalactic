@@ -37,7 +37,7 @@ function App() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [directoryPhotos, setDirectoryPhotos] = useState<Record<string, string>>({});
-  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number }>>({});
+  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -202,12 +202,13 @@ function App() {
       });
 
       const commissionsMap = await boldtrailApi.getTransactionCommissions(txIdsToFetchCommissions);
-      const finalCaps: Record<number, { capAmount: number, officeContribution: number }> = {};
+      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number }> = {};
 
       Object.keys(fubToCapInfo).forEach(fubId => {
         finalCaps[Number(fubId)] = {
           capAmount: fubToCapInfo[Number(fubId)].capAmount,
-          officeContribution: 0
+          officeContribution: 0,
+          anniversaryTs: fubToCapInfo[Number(fubId)].anniversaryTs
         };
       });
 
@@ -584,6 +585,7 @@ function App() {
         agentAvatar,
         capAmount: caps?.capAmount,
         officeContribution: caps?.officeContribution,
+        anniversaryTs: caps?.anniversaryTs,
         allDeals: allAgentDeals,
         initialTimeframe: timeframe,
         initialCustomStart: customStartDate,
@@ -690,6 +692,52 @@ function App() {
       </div>
 
       {authUser?.email === 'ali@questsold.com' && <CashFlowPredictor transactions={transactions} />}
+
+      {/* AGENT CAP PROGRESS: Display only for non-admins if they have valid cap data */}
+      {(!isAdmin && authUser?.email) && (() => {
+        const currentFubUser = users.find(u => u.email?.toLowerCase() === authUser.email?.toLowerCase());
+        if (currentFubUser && agentCaps[currentFubUser.id] && agentCaps[currentFubUser.id].capAmount !== undefined) {
+          const caps = agentCaps[currentFubUser.id];
+          const annivDateStr = new Date(caps.anniversaryTs).toLocaleDateString();
+          return (
+            <div className="w-full animate-in fade-in duration-500 delay-100 mb-6">
+              <div className="glass-card p-6 border border-white/5 rounded-2xl relative overflow-hidden bg-[#1c2336]/60 backdrop-blur-xl shrink-0 h-[140px] flex flex-col justify-center shadow-lg">
+                <div className="absolute inset-0 w-[500px] h-[500px] bg-gradient-to-tr from-brand-green/20 to-transparent opacity-20 blur-3xl rounded-full top-[-250px] right-[-150px]"></div>
+                <div className="absolute inset-0 top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 relative z-10 w-full pl-2 pr-2">
+                  <div>
+                    <h3 className="text-slate-200 font-bold mb-0.5 flex items-center gap-2 text-lg">
+                      Office Cap Progress
+                    </h3>
+                    <p className="text-slate-400 text-xs shadow-sm">Contributions since last anniversary rollover ({annivDateStr})</p>
+                  </div>
+                  <div className="flex items-center gap-2 font-semibold">
+                    <span className={caps.officeContribution >= caps.capAmount ? "text-green-400 text-2xl" : "text-blue-400 text-2xl"}>
+                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.officeContribution)}
+                    </span>
+                    <span className="text-slate-500 text-lg">
+                      / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(caps.capAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full bg-[#0a0f1c] rounded-full h-3 overflow-hidden shadow-inner relative border border-white/5 z-10 mt-1">
+                  <div className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 text-[10px] text-white/50 relative overflow-hidden ${caps.officeContribution >= caps.capAmount
+                    ? 'bg-gradient-to-r from-green-600/50 to-green-400 border border-green-400/50 shadow-[0_0_15px_rgba(74,222,128,0.4)]'
+                    : 'bg-gradient-to-r from-blue-700/50 to-blue-500 border border-blue-400/50 shadow-[0_0_15px_rgba(96,165,250,0.4)]'
+                    }`}
+                    style={{ width: `${Math.max(1, Math.min(100, (caps.officeContribution / caps.capAmount) * 100))}%` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-[200%] animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* MIDDLE ROW: Leaderboards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full animate-in fade-in duration-500 delay-100">
