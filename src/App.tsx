@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react';
 import DashboardLayout from './components/DashboardLayout';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from './services/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import AgentTable from './components/AgentTable';
 import TopProducers from './components/TopProducers';
 import { fetchAllPeople, fetchUsers, fetchAllDeals } from './services/fubApi';
@@ -36,6 +36,7 @@ function App() {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [directoryPhotos, setDirectoryPhotos] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -68,18 +69,29 @@ function App() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [peopleResponse, usersResponse, dealsResponse, btTransactionsRes, btUsersRes] = await Promise.all([
+        const [peopleResponse, usersResponse, dealsResponse, btTransactionsRes, btUsersRes, dbUsersSnap] = await Promise.all([
           fetchAllPeople(),
           fetchUsers(),
           fetchAllDeals(),
           boldtrailApi.getTransactions(),
-          boldtrailApi.getUsers()
+          boldtrailApi.getUsers(),
+          getDocs(collection(db, 'allowed_users'))
         ]);
         setPeople(peopleResponse.people || []);
         setUsers(usersResponse.users || []);
         setDeals(dealsResponse.deals || []);
         setTransactions(btTransactionsRes || []);
         setBtUsers(btUsersRes || []);
+
+        const photos: Record<string, string> = {};
+        dbUsersSnap.forEach(d => {
+          const data = d.data();
+          if (data.photoUrl && data.email) {
+            photos[data.email.toLowerCase()] = data.photoUrl;
+          }
+        });
+        setDirectoryPhotos(photos);
+
         setError(null);
       } catch (err: any) {
         console.error("Error loading FUB data:", err);
@@ -114,11 +126,14 @@ function App() {
     const agentMap = new Map<number, { name: string, total: number, converted: number, avatarUrl?: string }>();
     users.forEach(user => {
       if (user.status === 'Active' && (user.role === 'Owner' || user.role === 'Agent')) {
+        const emailLower = user.email?.toLowerCase();
+        const fallbackPic = user.picture?.["162x162"] || user.picture?.["60x60"] || user.picture?.original;
+
         agentMap.set(user.id, {
           name: user.name,
           total: 0,
           converted: 0,
-          avatarUrl: user.picture?.["162x162"] || user.picture?.["60x60"] || user.picture?.original
+          avatarUrl: (emailLower && directoryPhotos[emailLower]) || fallbackPic
         });
       }
     });
@@ -215,12 +230,15 @@ function App() {
     const prodMap = new Map<number, AgentProductionData>();
     users.forEach(user => {
       if (user.status === 'Active' && (user.role === 'Owner' || user.role === 'Agent')) {
+        const emailLower = user.email?.toLowerCase();
+        const fallbackPic = user.picture?.["162x162"] || user.picture?.["60x60"] || user.picture?.original;
         prodMap.set(user.id, {
           agentName: user.name,
           newLeads: 0,
           writtenDeals: 0,
           closedDeals: 0,
-          volume: 0
+          volume: 0,
+          avatarUrl: (emailLower && directoryPhotos[emailLower]) || fallbackPic
         });
       }
     });
@@ -334,8 +352,10 @@ function App() {
             if (fubUser) {
               const isOwner = fubUser.role === 'Owner';
               if (!tx.assigned_agent_name || ((tx as any)._temp_assigned_is_owner && !isOwner)) {
+                const emailLower = fubUser.email?.toLowerCase();
+                const fallbackPic = fubUser.picture?.["162x162"] || fubUser.picture?.["60x60"] || fubUser.picture?.original;
                 tx.assigned_agent_name = agentName;
-                tx.assigned_agent_avatar = fubUser.picture?.["162x162"] || fubUser.picture?.["60x60"] || fubUser.picture?.original;
+                tx.assigned_agent_avatar = (emailLower && directoryPhotos[emailLower]) || fallbackPic;
                 (tx as any)._temp_assigned_is_owner = isOwner;
               }
             }
@@ -357,7 +377,7 @@ function App() {
       productionTableData: Array.from(prodMap.values()),
       dashboardKpis: { activeListings, underContract, cancelled, closed }
     };
-  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin]);
+  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin, directoryPhotos]);
 
   // Format data for the TopProducers component
   const topProducersData = useMemo(() => {
@@ -366,14 +386,17 @@ function App() {
       .slice(0, 10)
       .map(a => {
         const user = users.find(u => u.name === a.agentName);
+        const emailLower = user?.email?.toLowerCase();
+        const fallbackPic = user?.picture?.["162x162"] || user?.picture?.["60x60"] || user?.picture?.original;
+
         return {
           name: a.agentName,
           closed: a.closedDeals,
           written: a.writtenDeals,
-          avatarUrl: user?.picture?.["162x162"] || user?.picture?.["60x60"] || user?.picture?.original
+          avatarUrl: (emailLower && directoryPhotos[emailLower]) || fallbackPic
         };
       });
-  }, [productionTableData, users]);
+  }, [productionTableData, users, directoryPhotos]);
 
   // --- Per-agent deal maps for drill-down navigation ---
   const agentDealMap = useMemo(() => {

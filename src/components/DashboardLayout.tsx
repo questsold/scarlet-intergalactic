@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Settings, LogOut, Menu, LayoutDashboard, Users, BarChart3, Megaphone, FileSpreadsheet, Clock } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../services/firebase';
-import { fetchUsers } from '../services/fubApi';
+import { auth, db } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -23,18 +23,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
 
         const loadFubUser = async () => {
             try {
-                const response = await fetchUsers();
-                if (response.users) {
-                    const match = response.users.find(u => u.email?.toLowerCase() === authUser.email?.toLowerCase());
-                    if (match) {
-                        const avatarUrl = match.picture?.["162x162"] || match.picture?.["60x60"] || match.picture?.original;
-                        if (avatarUrl) {
-                            setFubUserAvatar(avatarUrl);
-                        }
+                const docRef = doc(db, 'allowed_users', authUser.email!.toLowerCase());
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.photoUrl) {
+                        setFubUserAvatar(data.photoUrl);
                     }
                 }
             } catch (err) {
-                console.error("Failed to fetch FUB user for avatar:", err);
+                console.error("Failed to fetch user profile for avatar:", err);
             }
         };
 

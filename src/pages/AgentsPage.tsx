@@ -12,12 +12,14 @@ interface FubAgent {
     name: string;
     email?: string;
     status: string;
+    picture?: any;
 }
 
 interface UserAccess {
     email: string;
     hasAccess: boolean;
     role: 'admin' | 'user';
+    photoUrl?: string;
 }
 
 interface BtProfile {
@@ -126,9 +128,32 @@ const AgentsPage: React.FC = () => {
                 });
                 setBtProfiles(profileMapByEmail);
             }
+
+            // Sync agent photos from FUB to Firestore allowed_users directory immediately
+            const agentUpdates = fubAgents.filter(a => a.email && a.picture).map(async (agent) => {
+                const emailKey = agent.email!.toLowerCase();
+                const avatar = agent.picture?.["162x162"] || agent.picture?.["60x60"] || agent.picture?.original;
+                if (avatar) {
+                    const docRef = doc(db, 'allowed_users', emailKey);
+
+                    setAccessMap(prev => {
+                        const existing = prev[emailKey];
+                        if (!existing) return prev;
+                        return { ...prev, [emailKey]: { ...existing, photoUrl: avatar } };
+                    });
+
+                    await setDoc(docRef, {
+                        photoUrl: avatar,
+                        name: agent.name,
+                        email: emailKey
+                    }, { merge: true });
+                }
+            });
+            await Promise.all(agentUpdates);
+
         } catch (err) {
             console.error("Error syncing agent data:", err);
-            alert("Failed to sync data from BoldTrail.");
+            alert("Failed to sync data.");
         } finally {
             setIsSyncing(false);
         }
@@ -305,7 +330,18 @@ const AgentsPage: React.FC = () => {
                                                 return (
                                                     <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                                         <td className="px-6 py-4 font-medium text-slate-200">
-                                                            {agent.name}
+                                                            <div className="flex items-center gap-3">
+                                                                {dbAccess?.photoUrl ? (
+                                                                    <img src={dbAccess.photoUrl} alt={agent.name} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                                                ) : agent.picture ? (
+                                                                    <img src={agent.picture?.["60x60"] || agent.picture?.original} alt={agent.name} className="w-8 h-8 rounded-full object-cover border border-white/10 opacity-70" />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-white/10 text-xs text-slate-300">
+                                                                        {agent.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                                    </div>
+                                                                )}
+                                                                {agent.name}
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4 text-slate-400 text-sm">
                                                             {emailKey && btProfiles[emailKey]?.title || <span className="text-slate-600 italic">Advisor</span>}

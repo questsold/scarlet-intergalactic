@@ -7,6 +7,7 @@ export interface AgentProductionData {
     writtenDeals: number;
     closedDeals: number;
     volume: number;
+    avatarUrl?: string;
 }
 
 interface AgentProductionTableProps {
@@ -32,8 +33,8 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
 
     const sortedData = useMemo(() => {
         return [...data].sort((a, b) => {
-            const aValue = a[sortField];
-            const bValue = b[sortField];
+            const aValue = a[sortField] ?? '';
+            const bValue = b[sortField] ?? '';
 
             if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
             if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
@@ -125,9 +126,13 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
                                 <tr key={index} className="hover:bg-white/5 transition-colors group">
                                     <td className="px-6 py-4 font-medium text-slate-200">
                                         <div className="flex items-center space-x-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center text-xs font-bold text-blue-400 border border-blue-500/20">
-                                                {agent.agentName.substring(0, 2).toUpperCase()}
-                                            </div>
+                                            {agent.avatarUrl ? (
+                                                <img src={agent.avatarUrl} alt={agent.agentName} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center text-xs font-bold text-blue-400 border border-blue-500/20">
+                                                    {agent.agentName.substring(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
                                             {onAgentClick ? (
                                                 <button
                                                     onClick={() => onAgentClick(agent.agentName)}
