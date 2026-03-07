@@ -8,7 +8,7 @@ import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
 import { MultiSelect } from '../components/MultiSelect';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { clientPortalService } from '../services/clientPortalService';
 import { searchPeopleByEmail } from '../services/fubApi';
 
@@ -207,9 +207,41 @@ const TransactionsPage: React.FC = () => {
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
                 setAgents(validAgents);
 
-                // Fetch transactions - get all to ensure we don't just grab the oldest ones
-                const txs = await boldtrailApi.getTransactions();
-                setTransactions(txs);
+                let myTxs: BoldTrailTransaction[] | null = null;
+                if (authUser?.email) {
+                    try {
+                        const { doc, getDoc } = await import('firebase/firestore');
+                        const docRef = doc(db, 'allowed_users', authUser.email.toLowerCase());
+                        const docSnap = await getDoc(docRef);
+
+                        let isFullAdmin = false;
+                        if (docSnap.exists()) {
+                            const d = docSnap.data();
+                            if (d.isAdmin || d.role === 'Owner') isFullAdmin = true;
+                        } else {
+                            if (authUser.email.toLowerCase() === 'ali@questsold.com' || authUser.email.toLowerCase() === 'admin@questsold.com') isFullAdmin = true;
+                        }
+
+                        if (!isFullAdmin) {
+                            const myFubAcc = fubAgents.find((fa: any) => fa.email?.toLowerCase() === authUser.email!.toLowerCase());
+                            if (myFubAcc) {
+                                const matchedBtUser = btUsers.find(bu => bu.email?.toLowerCase() === myFubAcc.email?.toLowerCase());
+                                if (matchedBtUser) {
+                                    const explicitBtId = matchedBtUser.user_id || matchedBtUser.id;
+                                    myTxs = await boldtrailApi.getTransactions(1000, explicitBtId);
+                                }
+                            }
+                        }
+                    } catch (e) { console.error(e) }
+                }
+
+                if (myTxs) {
+                    setTransactions(myTxs);
+                } else {
+                    const txs = await boldtrailApi.getTransactions();
+                    setTransactions(txs);
+                }
+
             } catch (err) {
                 console.error("Error loading transactions:", err);
             } finally {
@@ -217,7 +249,7 @@ const TransactionsPage: React.FC = () => {
             }
         };
         fetchInitialData();
-    }, []);
+    }, [authUser]);
 
 
 

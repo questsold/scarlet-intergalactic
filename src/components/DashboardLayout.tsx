@@ -16,6 +16,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [authUser] = useAuthState(auth);
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
     const [fubUserAvatar, setFubUserAvatar] = useState<string | null>(null);
 
     useEffect(() => {
@@ -30,9 +31,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
                     if (data.photoUrl) {
                         setFubUserAvatar(data.photoUrl);
                     }
+                    if (data.isAdmin || data.role === 'Owner') {
+                        setIsAdmin(true);
+                    } else {
+                        setIsAdmin(false);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch user profile for avatar:", err);
+                // Fallback graceful
+                const isFounder = authUser.email?.toLowerCase() === 'ali@questsold.com' || authUser.email?.toLowerCase() === 'admin@questsold.com';
+                setIsAdmin(isFounder);
             }
         };
 
@@ -43,8 +52,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, headerActio
         { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { name: 'Transactions', icon: FileSpreadsheet, path: '/transactions' },
         { name: 'Client Portals', icon: Clock, path: '/portals' },
-        { name: 'Reports', icon: BarChart3, path: '/reports' },
-        { name: 'Marketing', icon: Megaphone, path: '/marketing' },
+        ...(isAdmin ? [
+            { name: 'Reports', icon: BarChart3, path: '/reports' },
+            { name: 'Marketing', icon: Megaphone, path: '/marketing' }
+        ] : []),
     ];
 
     return (
