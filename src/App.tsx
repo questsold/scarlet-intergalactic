@@ -248,7 +248,7 @@ function App() {
   // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
   // but closed in February should count toward February's closed total.
   const { productionTableData, dashboardKpis } = useMemo(() => {
-    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], closed: [], closedTotalYTD: [] } };
+    if (users.length === 0 || isAdmin === null) return { productionTableData: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], cancelledTotalYTD: [], closed: [], closedTotalYTD: [] } };
 
     // Determine if we should filter the global dashboard down to just the currently logged-in Agent
     let authFubUserId: number | null = null;
@@ -341,6 +341,7 @@ function App() {
     const underContract: UnifiedDeal[] = [];
     const underContractTotal: UnifiedDeal[] = [];
     const cancelled: UnifiedDeal[] = [];
+    const cancelledTotalYTD: UnifiedDeal[] = [];
     const closed: UnifiedDeal[] = [];
     const closedTotalYTD: UnifiedDeal[] = [];
 
@@ -410,10 +411,16 @@ function App() {
         if (belongsToAgent) underContract.push(tx);
       }
 
-      if (tx.status === 'cancelled') {
+      if (tx.status === 'cancelled' && belongsToAgent) {
         const cancelDateStr = tx.acceptance_date || tx.created_at;
         if (timeframe === 'All Time' || inRange(cancelDateStr)) {
-          if (belongsToAgent) cancelled.push(tx);
+          cancelled.push(tx);
+        }
+        if (cancelDateStr) {
+          const d = new Date(cancelDateStr);
+          if (d.getFullYear() === now.getFullYear()) {
+            cancelledTotalYTD.push(tx);
+          }
         }
       }
 
@@ -477,7 +484,7 @@ function App() {
 
     return {
       productionTableData: Array.from(prodMap.values()),
-      dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, closed, closedTotalYTD }
+      dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, cancelledTotalYTD, closed, closedTotalYTD }
     };
   }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, authUser, isAdmin, directoryPhotos, agentCaps]);
 
@@ -667,12 +674,20 @@ function App() {
         </div>
         <div
           onClick={() => handleKpiClick("Cancelled Deals", dashboardKpis.cancelled)}
-          className="glass-card p-6 flex flex-col items-center justify-center bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
+          className="glass-card p-6 flex flex-col justify-between bg-[#1c2336] border border-white/5 h-[160px] cursor-pointer hover:bg-white/5 transition-colors group"
         >
-          <h3 className="text-slate-200 font-bold text-lg w-full text-left group-hover:text-white transition-colors">Cancelled</h3>
-          <p className="text-slate-400 text-sm flex items-center gap-2 w-full text-left mt-1">Fell through in timeframe</p>
-          <div className="flex-1 flex items-center justify-start w-full pt-4">
-            <span className="text-5xl font-bold text-red-400 tracking-tight">{dashboardKpis.cancelled.length}</span>
+          <div className="flex w-full items-center justify-between">
+            <h3 className="text-slate-200 font-bold text-lg group-hover:text-white transition-colors">Cancelled</h3>
+          </div>
+          <div className="flex-1 flex items-end justify-between w-full pt-4">
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-4xl font-bold text-red-400 tracking-tight leading-none">{dashboardKpis.cancelled.length}</span>
+              <span className="text-slate-400 text-xs">Fell through in timeframe.</span>
+            </div>
+            <div className="flex flex-col items-end gap-1 pb-1">
+              <span className="text-2xl font-bold text-red-400/50 tracking-tight leading-none">{dashboardKpis.cancelledTotalYTD.length}</span>
+              <span className="text-slate-500 text-[10px] uppercase font-semibold tracking-wider">Total cancelled YTD</span>
+            </div>
           </div>
         </div>
         <div
