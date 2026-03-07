@@ -144,10 +144,12 @@ class BoldTrailApi {
             const data: BoldTrailTransaction = await response.json();
             return data;
         } catch (e) {
-            console.error('Failed to fetch transaction from BoldTrail', e);
+            console.error(`Failed to fetch BoldTrail transaction ID ${id}`, e);
             return null;
         }
     }
+
+
 
     /**
      * Fetches additional profile details for agents using the local Vercel proxy.
@@ -190,12 +192,12 @@ class BoldTrailApi {
      * @param transactionIds Array of BoldTrail transaction IDs (max 200).
      * @returns A map of transactionId to an array of BoldTrailUser.
      */
-    async getTransactionParticipants(transactionIds: number[]): Promise<Record<number, BoldTrailUser[]>> {
+    async getTransactionParticipants(transactionIds: number[]): Promise<Record<number, any[]>> {
         if (!transactionIds || transactionIds.length === 0) return {};
 
         // Chunk into max 100 per request
         const chunkSize = 100;
-        const results: Record<number, BoldTrailUser[]> = {};
+        const results: Record<number, any[]> = {};
 
         try {
             for (let i = 0; i < transactionIds.length; i += chunkSize) {

@@ -134,6 +134,12 @@ const TransactionsPage: React.FC = () => {
         setCurrentPage(1);
     }, [searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig]);
 
+    // Background process to check for missing client portals
+    useEffect(() => {
+        if (!authUser?.email || transactions.length === 0) return;
+        clientPortalService.autoSyncMissingPortals(transactions, authUser.email).catch(console.error);
+    }, [authUser?.email, transactions]);
+
     const filteredTransactions = useMemo(() => {
         let result = transactions;
 

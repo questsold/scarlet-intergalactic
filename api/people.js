@@ -16,11 +16,14 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'FUB_API_KEY is not configured.' });
     }
 
-    const { limit = 100, offset = 0, name } = req.query;
+    const { limit = 100, offset = 0, name, email } = req.query;
 
     let url = `https://api.followupboss.com/v1/people?limit=${limit}&offset=${offset}&sort=-created`;
     if (name) {
         url += `&name=${encodeURIComponent(name)}`;
+    }
+    if (email) {
+        url += `&email=${encodeURIComponent(email)}`;
     }
 
     try {

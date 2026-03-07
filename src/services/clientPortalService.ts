@@ -2,6 +2,8 @@ import { collection, doc, setDoc, getDoc, getDocs, updateDoc, query, where, dele
 import { db } from './firebase';
 import type { ClientPortal, ClientPortalMilestone } from '../types/clientPortal';
 import type { BoldTrailTransaction } from '../types/boldtrail';
+import { boldtrailApi } from './boldtrailApi';
+import { searchPeopleByEmail } from './fubApi';
 
 const PORTALS_COLLECTION = 'client_portals';
 
@@ -340,5 +342,95 @@ export const clientPortalService = {
     async deletePortal(id: string): Promise<void> {
         const docRef = doc(db, PORTALS_COLLECTION, id);
         await deleteDoc(docRef);
+    },
+
+    /**
+     * Automatically scans transactions and creates portals if they are missing.
+     * Extracts email from BoldTrail contacts, searches FUB, sets matching agent and created portal.
+     */
+    async autoSyncMissingPortals(currentTransactions: BoldTrailTransaction[], fallbackAgentEmail: string): Promise<void> {
+        try {
+            // Only care about active/under contract
+            const targetStatuses = ['listing', 'pending'];
+            const relevantTxs = currentTransactions.filter(tx => targetStatuses.includes((tx.status || '').toLowerCase()));
+
+            if (relevantTxs.length === 0) return;
+
+            // Get existing portals
+            const existingPortals = await this.getAllPortals();
+            const existingTxIds = new Set(existingPortals.map(p => String(p.transactionId)));
+
+            // Find missing portals
+            const missingTxs = relevantTxs.filter(tx => !existingTxIds.has(String(tx.id)));
+
+            if (missingTxs.length === 0) return;
+
+            // Batch fetch all participants
+            const txIds = missingTxs.map(tx => tx.id);
+            const participantsMap = await boldtrailApi.getTransactionParticipants(txIds);
+
+            for (const tx of missingTxs) {
+                try {
+                    // Fetch participants for this transaction
+                    const participants = participantsMap[tx.id] || [];
+
+                    // Look for buyer, seller or "Under Contract" contact
+                    let matchedContact = participants.find((p: any) => p.type === 'contact' &&
+                        (p.role === 'Buyer' || p.role === 'Seller' || p.role === 'Under Contract'));
+
+                    if (!matchedContact) {
+                        matchedContact = participants.find((p: any) => p.type === 'contact');
+                    }
+
+                    if (!matchedContact || !matchedContact.email) continue;
+
+                    const clientType = (tx.representing === 'seller' || matchedContact.role === 'Seller') ? 'seller' : 'buyer';
+
+                    // Search FUB
+                    const fubResults = await searchPeopleByEmail(matchedContact.email);
+                    const fubContact: any = fubResults?.people?.[0]; // Get top match
+
+                    if (!fubContact) continue;
+
+                    // Find assigned agent in FUB
+                    let portalAgentEmail = fallbackAgentEmail;
+                    let portalAgentName = undefined;
+                    let portalAgentPhotoUrl = undefined;
+
+                    if (fubContact.assignedUserId) {
+                        const assUser = fubContact.assignedUser || (fubContact.users && fubContact.users[0]);
+                        if (assUser && assUser.email) {
+                            portalAgentEmail = assUser.email;
+                            portalAgentName = assUser.name;
+                            portalAgentPhotoUrl = assUser.picture ? (assUser.picture["162x162"] || assUser.picture["60x60"] || assUser.picture.original) : undefined;
+                        } else if (fubContact.assignedTo) {
+                            portalAgentName = fubContact.assignedTo;
+                        }
+                    }
+
+                    // Create portal
+                    await this.createManualPortal(
+                        fubContact.name || matchedContact.name || matchedContact.first_name,
+                        tx.address || 'TBD Address',
+                        portalAgentEmail,
+                        undefined,
+                        fubContact.emails?.[0]?.value || matchedContact.email,
+                        fubContact.phones?.[0]?.value || '',
+                        clientType,
+                        portalAgentName,
+                        portalAgentPhotoUrl,
+                        fubContact.stage,
+                        tx
+                    );
+
+                    console.log(`Auto-synced portal for transaction ${tx.id} - ${tx.address} for client ${matchedContact.email}`);
+                } catch (innerErr) {
+                    console.error(`Failed to auto-sync transaction ${tx.id}`, innerErr);
+                }
+            }
+
+        } catch (e) {
+            console.error("Auto Sync Error", e);
+        }
     }
 };

@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         for (let i = 0; i < ids.length; i += batchSize) {
             const batch = ids.slice(i, i + batchSize);
             const promises = batch.map(async (id) => {
-                const targetUrl = `https://my.brokermint.com/api/v1/transactions/${id}/participants/users?api_key=${BOLDTRAIL_API_KEY}`;
+                const targetUrl = `https://my.brokermint.com/api/v1/transactions/${id}/participants?api_key=${BOLDTRAIL_API_KEY}`;
                 try {
                     const response = await fetch(targetUrl, {
                         method: 'GET',

@@ -51,6 +51,18 @@ export const searchPeople = async (nameQuery: string): Promise<FubPeopleResponse
     return response.json();
 };
 
+export const searchPeopleByEmail = async (email: string): Promise<FubPeopleResponse> => {
+    const response = await fetch(`${BASE_URL}/people?limit=10&email=${encodeURIComponent(email)}`, {
+        headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to search people by email: ${response.statusText}`);
+    }
+
+    return response.json();
+};
+
 export const fetchDeals = async (limit = 100, offset = 0): Promise<FubDealsResponse> => {
     const response = await fetch(`${BASE_URL}/deals?limit=${limit}&offset=${offset}`, {
         headers: getHeaders(),
