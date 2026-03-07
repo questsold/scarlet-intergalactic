@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -14,3 +14,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+export const createAgentAuthAccount = async (email: string, pass: string, name: string) => {
+    const tempApp = initializeApp(firebaseConfig, 'tempApp_' + Date.now());
+    const tempAuth = getAuth(tempApp);
+    try {
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, pass);
+        await updateProfile(userCredential.user, { displayName: name });
+        await tempAuth.signOut();
+        return { success: true, exists: false };
+    } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+            return { success: true, exists: true };
+        }
+        throw error;
+    } finally {
+        await deleteApp(tempApp);
+    }
+};

@@ -5,7 +5,7 @@ import { db } from '../services/firebase';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import { boldtrailApi } from '../services/boldtrailApi';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../services/firebase';
+import { auth, createAgentAuthAccount } from '../services/firebase';
 
 interface FubAgent {
     id: number;
@@ -201,6 +201,17 @@ const AgentsPage: React.FC = () => {
 
         setSaving(emailKey);
         try {
+            if (newHasAccess) {
+                const randomPart = Math.random().toString(36).slice(-6);
+                const generatedPass = `Quest${randomPart}!`;
+                const { exists } = await createAgentAuthAccount(emailKey, generatedPass, agentName);
+
+                if (!exists) {
+                    await new Promise(r => setTimeout(r, 500));
+                    alert(`An account was physically created for ${agentName}!\n\nEmail: ${emailKey}\nTemporary Password: ${generatedPass}\n\nPlease save this password before clicking OK so you can share it with them.`);
+                }
+            }
+
             const docRef = doc(db, 'allowed_users', emailKey);
             await setDoc(docRef, {
                 hasAccess: newHasAccess,
