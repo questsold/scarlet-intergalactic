@@ -4,7 +4,7 @@ import { Search, Loader2, X, ChevronUp, ChevronDown, PlusCircle, Home } from 'lu
 import { boldtrailApi } from '../services/boldtrailApi';
 import type { BoldTrailTransaction } from '../types/boldtrail';
 import TimeframeSelector from '../components/TimeframeSelector';
-import { filterByTimeframe, type Timeframe } from '../utils/timeFilters';
+import { type Timeframe } from '../utils/timeFilters';
 import { MultiSelect } from '../components/MultiSelect';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -270,11 +270,85 @@ const TransactionsPage: React.FC = () => {
     const filteredTransactions = useMemo(() => {
         let result = transactions;
 
-        // Apply timeframe filter based on created_at
-        result = filterByTimeframe(result, timeframe, customStartDate, customEndDate);
+        // Apply timeframe logic matched exactly to App.tsx KPIs
+        const now = new Date();
+        let rangeStart: Date | null = null;
+        let rangeEnd: Date | null = null;
+        if (timeframe !== 'All Time') {
+            switch (timeframe) {
+                case 'This Week': {
+                    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
+                    rangeStart = d;
+                    rangeEnd = new Date(d);
+                    rangeEnd.setDate(rangeEnd.getDate() + 7);
+                    break;
+                }
+                case 'This Month':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                    break;
+                case 'Last Month':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'This Quarter': {
+                    const qm = Math.floor(now.getMonth() / 3) * 3;
+                    rangeStart = new Date(now.getFullYear(), qm, 1);
+                    rangeEnd = new Date(now.getFullYear(), qm + 3, 1);
+                    break;
+                }
+                case 'This Year':
+                    rangeStart = new Date(now.getFullYear(), 0, 1);
+                    rangeEnd = new Date(now.getFullYear() + 1, 0, 1);
+                    break;
+                case '2025':
+                    rangeStart = new Date(2025, 0, 1); rangeEnd = new Date(2026, 0, 1); break;
+                case '2024':
+                    rangeStart = new Date(2024, 0, 1); rangeEnd = new Date(2025, 0, 1); break;
+                case 'Custom':
+                    if (customStartDate) rangeStart = new Date(customStartDate);
+                    if (customEndDate) {
+                        const end = new Date(customEndDate);
+                        end.setDate(end.getDate() + 1);
+                        rangeEnd = end;
+                    }
+                    break;
+            }
+        }
 
-        // Apply secondary filters
+        const inRange = (dateParam: string | number | undefined | null) => {
+            if (!dateParam) return false;
+            let val = dateParam;
+            if (typeof val === 'number' && val < 9999999999) {
+                val = val * 1000;
+            }
+            const d = new Date(val);
+            if (rangeStart && d < rangeStart) return false;
+            if (rangeEnd && d >= rangeEnd) return false;
+            return true;
+        };
+
+        // Apply secondary filters and date verification
         result = result.filter(tx => {
+            // Verify date based on target state to match Dashboard precisely
+            let matchesTime = false;
+            if (timeframe === 'All Time') {
+                matchesTime = true;
+            } else {
+                if (tx.status === 'listing') {
+                    matchesTime = inRange(tx.listing_date || tx.created_at || tx.updated_at);
+                } else if (tx.status === 'pending') {
+                    matchesTime = inRange(tx.acceptance_date || tx.created_at);
+                } else if (tx.status === 'closed') {
+                    matchesTime = inRange(tx.closing_date);
+                } else if (tx.status === 'cancelled') {
+                    matchesTime = inRange(tx.acceptance_date || tx.created_at);
+                } else {
+                    matchesTime = inRange(tx.created_at || tx.updated_at);
+                }
+            }
+            if (!matchesTime) return false;
             // Search query filter (Address)
             if (searchQuery) {
                 const searchLower = searchQuery.toLowerCase();
