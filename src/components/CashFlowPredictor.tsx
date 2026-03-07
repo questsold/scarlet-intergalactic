@@ -52,15 +52,19 @@ const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
                 // Use OFFICE_NET instead of total gross commission
                 const commission = commissionsMap[tx.id]?.officeNet || 0;
                 if (tx.closing_date) {
-                    if (tx.closing_date <= days30) {
-                        bucket30 += commission;
-                        count30++;
-                    } else if (tx.closing_date > days30 && tx.closing_date <= days60) {
-                        bucket60 += commission;
-                        count60++;
-                    } else if (tx.closing_date > days60 && tx.closing_date <= days90) {
-                        bucket90 += commission;
-                        count90++;
+                    const closeTimestamp = new Date(tx.closing_date).getTime();
+                    // Fallback to ensuring valid date
+                    if (closeTimestamp && !isNaN(closeTimestamp)) {
+                        if (closeTimestamp <= days30) {
+                            bucket30 += commission;
+                            count30++;
+                        } else if (closeTimestamp > days30 && closeTimestamp <= days60) {
+                            bucket60 += commission;
+                            count60++;
+                        } else if (closeTimestamp > days60 && closeTimestamp <= days90) {
+                            bucket90 += commission;
+                            count90++;
+                        }
                     }
                 }
             }
