@@ -48,25 +48,28 @@ export default async function handler(req, res) {
                         const data = await response.json();
                         // Summarize commissions
                         let officeNet = 0;
+                        let officeContribution = 0;
                         let agentNet = 0;
                         if (Array.isArray(data)) {
                             data.forEach(item => {
-                                if (item.item_type === 'COMPANY_DOLLAR_CONTRIBUTION') {
+                                if (item.item_type === 'OFFICE_NET') {
                                     officeNet += item.calculated_dollar_amount || 0;
+                                } else if (item.item_type === 'COMPANY_DOLLAR_CONTRIBUTION') {
+                                    officeContribution += item.calculated_dollar_amount || 0;
                                 } else if (item.item_type === 'AGENT_COMMISSIONS') {
                                     agentNet += item.calculated_dollar_amount || 0;
                                 }
                             });
                         }
-                        results[id] = { officeNet, agentNet };
+                        results[id] = { officeNet, officeContribution, agentNet };
                     } else if (response.status === 429) {
                         results[id] = { error: 429 };
                     } else {
                         // Keep a default for not found or error
-                        results[id] = { officeNet: 0, agentNet: 0 };
+                        results[id] = { officeNet: 0, officeContribution: 0, agentNet: 0 };
                     }
                 } catch (e) {
-                    results[id] = { officeNet: 0, agentNet: 0 };
+                    results[id] = { officeNet: 0, officeContribution: 0, agentNet: 0 };
                 }
             });
             await Promise.all(promises);

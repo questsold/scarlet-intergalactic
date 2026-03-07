@@ -16,7 +16,7 @@ const formatCurrency = (val: number) => {
 };
 
 const CashFlowPredictor: React.FC<Props> = ({ transactions }) => {
-    const [commissionsMap, setCommissionsMap] = useState<Record<number, { officeNet: number, agentNet: number }>>({});
+    const [commissionsMap, setCommissionsMap] = useState<Record<number, { officeNet: number, officeContribution: number, agentNet: number }>>({});
     const [loadingCommissions, setLoadingCommissions] = useState(false);
 
     useEffect(() => {

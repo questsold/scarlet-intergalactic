@@ -252,11 +252,11 @@ class BoldTrailApi {
      * @param transactionIds Array of BoldTrail transaction IDs (max 200).
      * @returns A map of transactionId to its office_net and agent_net.
      */
-    async getTransactionCommissions(transactionIds: number[]): Promise<Record<number, { officeNet: number, agentNet: number }>> {
+    async getTransactionCommissions(transactionIds: number[]): Promise<Record<number, { officeNet: number, officeContribution: number, agentNet: number }>> {
         if (!transactionIds || transactionIds.length === 0) return {};
 
         const chunkSize = 100;
-        const results: Record<number, { officeNet: number, agentNet: number }> = {};
+        const results: Record<number, { officeNet: number, officeContribution: number, agentNet: number }> = {};
 
         try {
             for (let i = 0; i < transactionIds.length; i += chunkSize) {
