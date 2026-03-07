@@ -360,8 +360,12 @@ export const clientPortalService = {
             const existingPortals = await this.getAllPortals();
             const existingTxIds = new Set(existingPortals.map(p => String(p.transactionId)));
 
-            // Find missing portals
-            const missingTxs = relevantTxs.filter(tx => !existingTxIds.has(String(tx.id)));
+            // Find missing portals that were created AFTER this feature went live (March 6, 2026)
+            const AUTO_SYNC_CUTOFF = new Date('2026-03-06T00:00:00Z').getTime();
+            const missingTxs = relevantTxs.filter(tx =>
+                !existingTxIds.has(String(tx.id)) &&
+                ((tx.created_at || Number.MAX_SAFE_INTEGER) > AUTO_SYNC_CUTOFF)
+            );
 
             if (missingTxs.length === 0) return;
 
