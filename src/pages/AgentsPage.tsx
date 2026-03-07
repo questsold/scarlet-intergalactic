@@ -74,9 +74,12 @@ const AgentsPage: React.FC = () => {
                 setFubAgents(questAgents);
 
                 // 2. Fetch allowed_users from Firestore
-                const querySnapshot = await getDocs(collection(db, 'allowed_users'));
+                const querySnapshot = await getDocs(collection(db, 'allowed_users')).catch(err => {
+                    console.warn("Insufficient permissions for allowed_users:", err);
+                    return { forEach: () => { } } as any;
+                });
                 const map: Record<string, UserAccess> = {};
-                querySnapshot.forEach((doc) => {
+                querySnapshot.forEach((doc: any) => {
                     map[doc.id] = { ...doc.data(), email: doc.id } as UserAccess;
                 });
                 setAccessMap(map);
@@ -146,7 +149,9 @@ const AgentsPage: React.FC = () => {
                         photoUrl: avatar,
                         name: agent.name,
                         email: emailKey
-                    }, { merge: true });
+                    }, { merge: true }).catch(err => {
+                        console.warn(`Could not sync avatar to firestore for ${emailKey}:`, err);
+                    });
                 }
             });
             await Promise.all(agentUpdates);
@@ -188,9 +193,9 @@ const AgentsPage: React.FC = () => {
                     role: newRole
                 }
             }));
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error saving access toggle:", err);
-            alert("Failed to save changes to the database.");
+            alert(`Failed to save changes to the database. Error: ${err.message}`);
         } finally {
             setSaving(null);
         }
@@ -225,9 +230,9 @@ const AgentsPage: React.FC = () => {
                     role: newRole
                 }
             }));
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error saving access toggle:", err);
-            alert("Failed to save changes to the database.");
+            alert(`Failed to save changes to the database. Error: ${err.message}`);
         } finally {
             setSaving(null);
         }
