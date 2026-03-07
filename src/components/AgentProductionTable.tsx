@@ -61,7 +61,7 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
 
     return (
         <div className="glass-card shadow-lg flex flex-col w-full animate-in fade-in duration-500 delay-100 overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+            <div className="p-6 border-b border-white/5 flex items-center justify-center">
                 <div className="flex items-center space-x-2">
                     <h2 className="text-xl font-bold text-slate-200">Agent Production</h2>
                 </div>
@@ -95,7 +95,7 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
                                     Volume {renderSortIcon('volume')}
                                 </div>
                             </th>
-                            <th className="px-6 py-4 font-medium text-right transition-colors hover:bg-white/5 cursor-pointer group" onClick={() => handleSort('officeContribution')}>
+                            <th className="px-8 py-4 font-medium text-right transition-colors hover:bg-white/5 cursor-pointer group" onClick={() => handleSort('officeContribution')}>
                                 <div className="flex items-center justify-end">
                                     Cap Progress {renderSortIcon('officeContribution')}
                                 </div>
@@ -124,7 +124,7 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
                                 <td className="px-6 py-4 text-right">
                                     {formatCurrency(sortedData.reduce((acc, curr) => acc + curr.volume, 0))}
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-8 py-4 text-right">
                                     {/* Cap totals omitting for simplicity */}
                                     —
                                 </td>
@@ -172,10 +172,10 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
                                     <td className="px-6 py-4 text-right font-semibold text-slate-100">
                                         {formatCurrency(agent.volume)}
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-8 py-4 text-right">
                                         {(agent.capAmount !== undefined && agent.officeContribution !== undefined) ? (
                                             <div className="flex flex-col items-end gap-1">
-                                                <div className="flex items-center justify-between w-24 text-xs font-semibold">
+                                                <div className="flex items-center justify-between w-32 text-xs font-semibold">
                                                     <span className={agent.officeContribution >= agent.capAmount ? "text-green-400" : "text-blue-400"}>
                                                         {formatCurrency(agent.officeContribution)}
                                                     </span>
@@ -183,7 +183,7 @@ export const AgentProductionTable: React.FC<AgentProductionTableProps> = ({ data
                                                         / {formatCurrency(agent.capAmount)}
                                                     </span>
                                                 </div>
-                                                <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className="w-32 bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                                     <div className={`h-full rounded-full transition-all duration-1000 ${agent.officeContribution >= agent.capAmount ? 'bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]'}`}
                                                         style={{ width: `${Math.min(100, (agent.officeContribution / agent.capAmount) * 100)}%` }}
                                                     ></div>

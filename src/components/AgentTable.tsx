@@ -29,7 +29,7 @@ const AgentTable: React.FC<AgentTableProps> = ({ data, onAgentClick }) => {
 
     return (
         <div className="glass-card flex flex-col h-full bg-[#1c2336] border border-white/5 rounded-2xl overflow-hidden">
-            <div className="p-5 border-b border-white/5">
+            <div className="p-5 border-b border-white/5 flex items-center justify-center">
                 <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                     Agent Conversion Leaderboard 🤩
                 </h2>
