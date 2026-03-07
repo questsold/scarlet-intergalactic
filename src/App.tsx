@@ -32,7 +32,7 @@ function App() {
   const [btUsers, setBtUsers] = useState<BoldTrailUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = useState<Timeframe>('This Month');
+  const [timeframe, setTimeframe] = useState<Timeframe>('This Year');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
