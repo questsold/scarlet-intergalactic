@@ -58,8 +58,8 @@ class BoldTrailApi {
      * Fetches all transactions from BoldTrail Backoffice using the local Vercel proxy.
      * Caches the results to prevent hitting API rate limits.
      */
-    async getTransactions(limit: number = 10000): Promise<BoldTrailTransaction[]> {
-        if (cachedTransactions && (Date.now() - lastCacheTime < CACHE_DURATION)) {
+    async getTransactions(limit: number = 10000, ownerId?: number): Promise<BoldTrailTransaction[]> {
+        if (!ownerId && cachedTransactions && (Date.now() - lastCacheTime < CACHE_DURATION)) {
             // Return from cache if we want fewer or same items. 
             // We sort by created_at desc so if limit < total, we get newest first.
             const sortedCache = [...cachedTransactions].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
@@ -75,6 +75,9 @@ class BoldTrailApi {
                 let url = `/api/transactions?count=${batchSize}&sort_by=created_at&sort_order=desc`;
                 if (startingFromId) {
                     url += `&starting_from_id=${startingFromId}`;
+                }
+                if (ownerId) {
+                    url += `&owned_by=User-${ownerId}`;
                 }
 
                 const response = await fetch(url, {
@@ -108,8 +111,8 @@ class BoldTrailApi {
                 startingFromId = data[data.length - 1].id;
             }
 
-            // Update cache
-            if (allTransactions.length > 0) {
+            // Update cache only for global fetch
+            if (!ownerId && allTransactions.length > 0) {
                 cachedTransactions = allTransactions;
                 lastCacheTime = Date.now();
             }

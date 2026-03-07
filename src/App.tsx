@@ -29,6 +29,7 @@ function App() {
   const [users, setUsers] = useState<FubUser[]>([]);
   const [deals, setDeals] = useState<FubDeal[]>([]);
   const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
+  const [ownedTransactions, setOwnedTransactions] = useState<BoldTrailTransaction[] | null>(null);
   const [btUsers, setBtUsers] = useState<BoldTrailUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,10 +83,12 @@ function App() {
           })
         ]);
         setPeople(peopleResponse.people || []);
-        setUsers(usersResponse.users || []);
+        const uRes = usersResponse.users || [];
+        const buRes = btUsersRes || [];
+        setUsers(uRes);
+        setBtUsers(buRes);
         setDeals(dealsResponse.deals || []);
         setTransactions(btTransactionsRes || []);
-        setBtUsers(btUsersRes || []);
 
         const photos: Record<string, string> = {};
         dbUsersSnap.forEach(d => {
@@ -95,6 +98,18 @@ function App() {
           }
         });
         setDirectoryPhotos(photos);
+
+        const currentFubUser = authUser?.email ? uRes.find(u => u.email?.toLowerCase() === authUser.email!.toLowerCase()) : null;
+        let myTxs: BoldTrailTransaction[] | null = null;
+
+        if (currentFubUser && currentFubUser.role !== 'Owner') {
+          const btUser = buRes.find(bu => bu.email?.toLowerCase() === currentFubUser.email?.toLowerCase());
+          if (btUser) {
+            const btUserId = btUser.user_id || btUser.id;
+            myTxs = await boldtrailApi.getTransactions(1000, btUserId);
+          }
+        }
+        setOwnedTransactions(myTxs);
 
         setError(null);
       } catch (err: any) {
@@ -462,7 +477,8 @@ function App() {
           volume: 0,
           avatarUrl: (emailLower && directoryPhotos[emailLower]) || fallbackPic,
           capAmount: caps?.capAmount,
-          officeContribution: caps?.officeContribution
+          officeContribution: caps?.officeContribution,
+          fubUserId: user.id
         });
       }
     });
@@ -503,19 +519,23 @@ function App() {
       if (u.email) emailToFubUserId.set(u.email.toLowerCase(), u.id);
     });
 
-    transactions.forEach(tx => {
+
+    const transactionsToIterateForKPIs = (ownedTransactions !== null && authFubUserId) ? ownedTransactions : transactions;
+
+    transactionsToIterateForKPIs.forEach(tx => {
       // Is this deal belonging to the logged in agent?
       let belongsToAgent = false;
-      let _btAgentIds = txParticipants[tx.id];
-      if (!_btAgentIds || _btAgentIds.length === 0) {
-        _btAgentIds = [];
-        if (tx.buying_side_representer?.id) _btAgentIds.push(tx.buying_side_representer.id);
-        if (tx.listing_side_representer?.id) _btAgentIds.push(tx.listing_side_representer.id);
-      }
-
       if (!authFubUserId) {
         belongsToAgent = true; // Admin sees all
+      } else if (ownedTransactions !== null) {
+        belongsToAgent = true; // Entire list belongs to the agent
       } else {
+        let _btAgentIds = txParticipants[tx.id];
+        if (!_btAgentIds || _btAgentIds.length === 0) {
+          _btAgentIds = [];
+          if (tx.buying_side_representer?.id) _btAgentIds.push(tx.buying_side_representer.id);
+          if (tx.listing_side_representer?.id) _btAgentIds.push(tx.listing_side_representer.id);
+        }
         for (const btAgentId of _btAgentIds) {
           const agentEmail = btIdToEmailMap.get(btAgentId);
           const agentName = btIdToNameMap.get(btAgentId);
@@ -578,6 +598,18 @@ function App() {
           closedTotalYTD.push(tx);
         }
       }
+    });
+
+    transactions.forEach(tx => {
+      const contractDateStr = tx.acceptance_date || tx.created_at;
+      const isWritten = timeframe === 'All Time' || inRange(contractDateStr);
+
+      const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
+      const isValidWrittenStatus = allowedWrittenStatuses.includes(tx.status);
+
+      const closeDateStr = tx.closing_date;
+      const isClosedState = tx.status === 'closed';
+      const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
 
       // Map agent production
       let btAgentIds = txParticipants[tx.id];
@@ -934,11 +966,15 @@ function App() {
       </div>
 
       {/* BOTTOM SECTION (Full Width: Agent Production) */}
-      {isAdmin && (
-        <div className="w-full mt-6 animate-in fade-in duration-500 delay-200">
-          <AgentProductionTable data={productionTableData} onAgentClick={handleAgentClick} />
-        </div>
-      )}
+      <div className="w-full mt-6 animate-in fade-in duration-500 delay-200">
+        <AgentProductionTable
+          data={isAdmin ? productionTableData : (() => {
+            const currentFubUser = users.find(u => u.email?.toLowerCase() === authUser?.email?.toLowerCase());
+            return currentFubUser ? productionTableData.filter(d => d.fubUserId === currentFubUser.id) : [];
+          })()}
+          onAgentClick={handleAgentClick}
+        />
+      </div>
 
     </DashboardLayout>
   );

@@ -11,6 +11,7 @@ export interface AgentProductionData {
     capAmount?: number;
     officeContribution?: number;
     officeContributionTimeframe?: number;
+    fubUserId?: number;
 }
 
 interface AgentProductionTableProps {
