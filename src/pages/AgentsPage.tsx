@@ -20,6 +20,7 @@ interface UserAccess {
     hasAccess: boolean;
     role: 'admin' | 'user';
     photoUrl?: string;
+    btProfile?: BtProfile;
 }
 
 interface BtProfile {
@@ -79,10 +80,16 @@ const AgentsPage: React.FC = () => {
                     return { forEach: () => { } } as any;
                 });
                 const map: Record<string, UserAccess> = {};
+                const loadedBtProfiles: Record<string, BtProfile> = {};
                 querySnapshot.forEach((doc: any) => {
-                    map[doc.id] = { ...doc.data(), email: doc.id } as UserAccess;
+                    const data = doc.data() as UserAccess;
+                    map[doc.id] = { ...data, email: doc.id };
+                    if (data.btProfile) {
+                        loadedBtProfiles[doc.id.toLowerCase()] = data.btProfile;
+                    }
                 });
                 setAccessMap(map);
+                setBtProfiles(loadedBtProfiles);
 
                 // 3. Fetch BoldTrail Users to match emails to BT IDs
                 const btUsers = await boldtrailApi.getUsers();
@@ -115,9 +122,10 @@ const AgentsPage: React.FC = () => {
                 }
             });
 
+            const profileMapByEmail: Record<string, BtProfile> = {};
+
             if (btIdsToFetch.length > 0) {
                 const profiles = await boldtrailApi.getUserDetails(btIdsToFetch);
-                const profileMapByEmail: Record<string, BtProfile> = {};
 
                 Object.values(profiles).forEach((profile: any) => {
                     if (profile && profile.email) {
@@ -136,21 +144,24 @@ const AgentsPage: React.FC = () => {
             const agentUpdates = fubAgents.filter(a => a.email && a.picture).map(async (agent) => {
                 const emailKey = agent.email!.toLowerCase();
                 const avatar = agent.picture?.["162x162"] || agent.picture?.["60x60"] || agent.picture?.original;
-                if (avatar) {
+                if (avatar || profileMapByEmail[emailKey]) {
                     const docRef = doc(db, 'allowed_users', emailKey);
 
                     setAccessMap(prev => {
                         const existing = prev[emailKey];
                         if (!existing) return prev;
-                        return { ...prev, [emailKey]: { ...existing, photoUrl: avatar } };
+                        return { ...prev, [emailKey]: { ...existing, photoUrl: avatar || existing.photoUrl, btProfile: profileMapByEmail[emailKey] || existing.btProfile } };
                     });
 
-                    await setDoc(docRef, {
-                        photoUrl: avatar,
+                    const updatePayload: any = {
                         name: agent.name,
                         email: emailKey
-                    }, { merge: true }).catch(err => {
-                        console.warn(`Could not sync avatar to firestore for ${emailKey}:`, err);
+                    };
+                    if (avatar) updatePayload.photoUrl = avatar;
+                    if (profileMapByEmail[emailKey]) updatePayload.btProfile = profileMapByEmail[emailKey];
+
+                    await setDoc(docRef, updatePayload, { merge: true }).catch(err => {
+                        console.warn(`Could not sync data to firestore for ${emailKey}:`, err);
                     });
                 }
             });
