@@ -43,6 +43,7 @@ const ClientPortalsPage: React.FC = () => {
     const [addressResults, setAddressResults] = useState<BoldTrailTransaction[]>([]);
     const [isSearchingAddress, setIsSearchingAddress] = useState(false);
     const [showAddressDropdown, setShowAddressDropdown] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState<BoldTrailTransaction | undefined>(undefined);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -118,12 +119,14 @@ const ClientPortalsPage: React.FC = () => {
                 clientType as 'buyer' | 'seller',
                 portalAgentName,
                 portalAgentPhotoUrl,
-                selectedClientStage
+                selectedClientStage,
+                selectedTransaction
             );
             setIsModalOpen(false);
             setClientType('');
             setBuyerStatus('');
             setSellerStatus('');
+            setSelectedTransaction(undefined);
             navigate(`/portals/${newPortalId}`);
         } catch (err) {
             console.error("Error creating portal:", err);
@@ -387,6 +390,7 @@ const ClientPortalsPage: React.FC = () => {
                                                 setBuyerStatus('');
                                                 setSellerStatus('');
                                                 setPropertyAddress('');
+                                                setSelectedTransaction(undefined);
                                             }}
                                             className="text-slate-400 hover:text-white text-sm"
                                         >
@@ -447,6 +451,7 @@ const ClientPortalsPage: React.FC = () => {
                                                     value={propertyAddress}
                                                     onChange={(e) => {
                                                         setPropertyAddress(e.target.value);
+                                                        setSelectedTransaction(undefined);
                                                         setShowAddressDropdown(true);
                                                     }}
                                                     placeholder="e.g. 123 Main St"
@@ -469,6 +474,7 @@ const ClientPortalsPage: React.FC = () => {
                                                                 key={idx}
                                                                 onClick={() => {
                                                                     setPropertyAddress(formattedAddress);
+                                                                    setSelectedTransaction(tx);
                                                                     setShowAddressDropdown(false);
                                                                     setAddressResults([]);
                                                                 }}

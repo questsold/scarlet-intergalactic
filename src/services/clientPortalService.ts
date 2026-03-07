@@ -251,12 +251,13 @@ export const clientPortalService = {
         clientType?: 'buyer' | 'seller',
         agentName?: string,
         agentPhotoUrl?: string,
-        fubStage?: string
+        fubStage?: string,
+        transaction?: BoldTrailTransaction
     ): Promise<string> {
         const portalRef = doc(collection(db, PORTALS_COLLECTION));
         const now = Date.now();
 
-        const milestones = this.generateDefaultMilestones(undefined, clientType, fubStage);
+        const milestones = this.generateDefaultMilestones(transaction, clientType, fubStage);
         if (questStartDate) {
             // Shift all other milestones up by 1 order
             milestones.forEach(m => m.order += 1);
@@ -274,7 +275,7 @@ export const clientPortalService = {
 
         const portal: ClientPortal = {
             id: portalRef.id,
-            transactionId: `manual_${now}`,
+            transactionId: transaction?.id || `manual_${now}`,
             clientName: clientName,
             clientEmail: clientEmail,
             clientPhone: clientPhone,
