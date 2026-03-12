@@ -1,4 +1,4 @@
-export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
+export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'Last 3 Months' | 'Last 6 Months' | 'Last 90 days' | 'Last 180 days' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
 
 export const filterByTimeframe = <T extends { created?: string, createdAt?: string, created_at?: number }>(
     data: T[],
@@ -32,6 +32,22 @@ export const filterByTimeframe = <T extends { created?: string, createdAt?: stri
         case 'Last Month':
             startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             endDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'Last 3 Months':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'Last 6 Months':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'Last 90 days':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+            break;
+        case 'Last 180 days':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 180);
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
             break;
         case 'This Quarter':
             const currentMonth = now.getMonth();

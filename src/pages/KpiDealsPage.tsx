@@ -210,6 +210,22 @@ export const KpiDealsPage: React.FC = () => {
                     rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                     rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
                     break;
+                case 'Last 3 Months':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'Last 6 Months':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'Last 90 days':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    break;
+                case 'Last 180 days':
+                    rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 180);
+                    rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    break;
                 case 'This Quarter': {
                     const qm = Math.floor(now.getMonth() / 3) * 3;
                     rangeStart = new Date(now.getFullYear(), qm, 1);
