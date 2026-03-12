@@ -167,7 +167,7 @@ const TransactionsPage: React.FC = () => {
             let unsubscribe: () => void;
             try {
                 // Fetch FUB agents
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/fub-proxy?action=users');
                 const data = response.ok ? await response.json() : { users: [] };
                 const fubAgents = data.users || [];
                 setUsers(fubAgents); // Store FUB users

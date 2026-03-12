@@ -70,7 +70,7 @@ const AgentsPage: React.FC = () => {
         const fetchData = async () => {
             try {
                 // 1. Fetch Agents from FUB API proxy
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/fub-proxy?action=users');
                 if (!response.ok) throw new Error('Failed to fetch FUB users');
                 const data = await response.json();
                 const agents: FubAgent[] = data.users || [];
