@@ -1,10 +1,33 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
-import { Shield, Key, Bell, CreditCard, Puzzle, Users } from 'lucide-react';
+import { Shield, Key, Bell, CreditCard, Puzzle, Users, UserPlus } from 'lucide-react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const SettingsPage: React.FC = () => {
     const navigate = useNavigate();
+    const [authUser] = useAuthState(auth);
+    const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
+
+    React.useEffect(() => {
+        if (!authUser?.email) return;
+        const checkAdmin = async () => {
+            try {
+                const userDoc = await getDoc(doc(db, 'allowed_users', authUser.email!.toLowerCase()));
+                if (userDoc.exists() && (userDoc.data().role === 'admin' || userDoc.data().role === 'Owner' || userDoc.data().isAdmin)) {
+                    setIsAdmin(true);
+                } else {
+                    setIsAdmin(false);
+                }
+            } catch (err) {
+                const isFounder = authUser.email?.toLowerCase() === 'ali@questsold.com' || authUser.email?.toLowerCase() === 'admin@questsold.com';
+                setIsAdmin(isFounder);
+            }
+        };
+        checkAdmin();
+    }, [authUser]);
 
     // Placeholder cards for future settings
     const settingsCards = [
@@ -16,6 +39,14 @@ const SettingsPage: React.FC = () => {
             bg: "bg-brand-green/10",
             path: "/agents"
         },
+        ...(isAdmin ? [{
+            title: "New Lead Input Form",
+            description: "Manually input a lead and automatically route it to Follow Up Boss.",
+            icon: UserPlus,
+            color: "text-brand-green",
+            bg: "bg-brand-green/10",
+            path: "/settings/new-lead-form"
+        }] : []),
         {
             title: "Notification Preferences",
             description: "Control how and when you receive alerts from the platform.",

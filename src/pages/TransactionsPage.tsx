@@ -11,20 +11,14 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../services/firebase';
 import { clientPortalService } from '../services/clientPortalService';
 import { searchPeopleByEmail } from '../services/fubApi';
+import { collection, query, onSnapshot, doc, getDoc } from 'firebase/firestore';
 
 const TransactionsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
     const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
     const [agents, setAgents] = useState<{ id: number; userId?: number; name: string; email?: string; avatarUrl?: string }[]>([]);
-
-    const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
-        try {
-            const cached = localStorage.getItem('bt_tx_parts_v1');
-            if (cached) return JSON.parse(cached);
-        } catch (e) { }
-        return {};
-    });
+    const [users, setUsers] = useState<any[]>([]); // To store FUB users for agent lookup
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>(['Active Listings', 'Under Contract', 'Closed', 'Cancelled']);
@@ -170,11 +164,13 @@ const TransactionsPage: React.FC = () => {
 
     useEffect(() => {
         const fetchInitialData = async () => {
+            let unsubscribe: () => void;
             try {
                 // Fetch FUB agents
                 const response = await fetch('/api/users');
                 const data = response.ok ? await response.json() : { users: [] };
                 const fubAgents = data.users || [];
+                setUsers(fubAgents); // Store FUB users
 
                 // Filter valid questsold emails + Ali
                 const questAgentEmails = fubAgents.filter((a: any) => {
@@ -208,10 +204,8 @@ const TransactionsPage: React.FC = () => {
                 validAgents.sort((a, b) => a.name.localeCompare(b.name));
                 setAgents(validAgents);
 
-                let myTxs: BoldTrailTransaction[] | null = null;
                 if (authUser?.email) {
                     try {
-                        const { doc, getDoc } = await import('firebase/firestore');
                         const docRef = doc(db, 'allowed_users', authUser.email.toLowerCase());
                         const docSnap = await getDoc(docRef);
 
@@ -224,32 +218,33 @@ const TransactionsPage: React.FC = () => {
                         }
 
                         setIsAdmin(isFullAdmin);
-
-                        if (!isFullAdmin) {
-                            const myFubAcc = fubAgents.find((fa: any) => fa.email?.toLowerCase() === authUser.email!.toLowerCase());
-                            if (myFubAcc) {
-                                const matchedBtUser = btUsers.find(bu => bu.email?.toLowerCase() === myFubAcc.email?.toLowerCase());
-                                if (matchedBtUser) {
-                                    const explicitBtId = matchedBtUser.user_id || matchedBtUser.id;
-                                    myTxs = await boldtrailApi.getTransactions(1000, explicitBtId);
-                                }
-                            }
-                        }
                     } catch (e) { console.error(e) }
                 }
 
-                if (myTxs) {
-                    setTransactions(myTxs);
-                } else {
-                    const txs = await boldtrailApi.getTransactions();
-                    setTransactions(txs);
-                }
+                // Connect to Firestore Transactions collection
+                const q = query(collection(db, 'transactions'));
+                unsubscribe = onSnapshot(q, (snapshot) => {
+                    let loadedTxs: BoldTrailTransaction[] = [];
+                    snapshot.forEach((doc) => {
+                        const tx = doc.data() as BoldTrailTransaction;
+                        loadedTxs.push(tx);
+                    });
+
+                    loadedTxs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+                    setTransactions(loadedTxs);
+                }, (err) => {
+                    console.error("Error loading transactions from Firestore:", err);
+                });
 
             } catch (err) {
                 console.error("Error loading transactions:", err);
             } finally {
                 setLoading(false);
             }
+            // Return cleanup function to unsubscribe from Firestore listener
+            return () => {
+                if (unsubscribe) unsubscribe();
+            };
         };
         fetchInitialData();
     }, [authUser]);
@@ -377,19 +372,31 @@ const TransactionsPage: React.FC = () => {
 
             // Agent filter
             if (agentFilter.length > 0) {
-                const participantIds = txParticipants[tx.id] || [];
+                const ownerFubIds = (tx as any).ownerFubIds || [];
                 let hasMatch = false;
-                for (const pid of participantIds) {
-                    const found = agents.find(a => a.id === pid || a.userId === pid);
-                    if (found && agentFilter.includes(String(found.id))) {
+                for (const fubId of ownerFubIds) {
+                    // agentFilter stores FUB user IDs as strings
+                    if (agentFilter.includes(String(fubId))) {
                         hasMatch = true;
                         break;
                     }
                 }
                 if (!hasMatch) {
+                    // Also check if the agentFilter includes the BT agent ID if available
                     const isBuyingAgent = tx.buying_side_representer?.id && agentFilter.includes(String(tx.buying_side_representer.id));
                     const isListingAgent = tx.listing_side_representer?.id && agentFilter.includes(String(tx.listing_side_representer.id));
                     if (!isBuyingAgent && !isListingAgent) return false;
+                }
+            }
+
+            // Check ownership for agents
+            if (authUser?.email && !isAdmin) {
+                const currentFubUser = users.find(u => u.email?.toLowerCase() === authUser.email!.toLowerCase());
+                if (currentFubUser && currentFubUser.role !== 'Owner') {
+                    const owners = (tx as any).ownerFubIds || [];
+                    if (!owners.includes(currentFubUser.id)) {
+                        return false;
+                    }
                 }
             }
 
@@ -404,17 +411,13 @@ const TransactionsPage: React.FC = () => {
 
                 if (sortConfig.key === 'agentName') {
                     const getSortName = (txObj: any) => {
-                        const pIds = txParticipants[txObj.id] || [];
-                        let fAgent = null;
-                        for (const pid of pIds) {
-                            fAgent = agents.find(a => a.id === pid || a.userId === pid);
-                            if (fAgent) break;
+                        if (txObj.assigned_agent_name) return txObj.assigned_agent_name;
+                        const ownerFubIds = txObj.ownerFubIds || [];
+                        for (const fubId of ownerFubIds) {
+                            const fubUser = users.find(u => u.id === fubId);
+                            if (fubUser) return fubUser.name;
                         }
-                        if (!fAgent) {
-                            const aId = txObj.buying_side_representer?.id || txObj.listing_side_representer?.id;
-                            fAgent = agents.find(a => a.id === aId || a.userId === aId);
-                        }
-                        return fAgent ? fAgent.name : 'Unknown Agent';
+                        return 'Unknown Agent';
                     };
                     aValue = getSortName(a);
                     bValue = getSortName(b);
@@ -438,40 +441,12 @@ const TransactionsPage: React.FC = () => {
         }
 
         return result;
-    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents]);
+    }, [transactions, searchQuery, statusFilter, agentFilter, timeframe, customStartDate, customEndDate, sortConfig, agents, users, authUser, isAdmin]);
 
     const paginatedTransactions = useMemo(() => {
         const startIndex = (currentPage - 1) * pageSize;
         return filteredTransactions.slice(startIndex, startIndex + pageSize);
     }, [filteredTransactions, currentPage, pageSize]);
-
-    // Fetch participants for strictly displayed transactions to avoid hitting API rate limits
-    useEffect(() => {
-        if (paginatedTransactions.length === 0) return;
-        const missingIds = paginatedTransactions.map(tx => tx.id).filter(id => !txParticipants[id]);
-
-        if (missingIds.length > 0) {
-            boldtrailApi.getTransactionParticipants(missingIds).then(res => {
-                setTxParticipants(prev => {
-                    const next = { ...prev };
-                    let changed = false;
-                    for (const [txIdStr, pUsers] of Object.entries(res)) {
-                        if ((pUsers as any).error === 429) continue;
-                        const txId = parseInt(txIdStr);
-                        const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
-                        const targets = owners.length > 0 ? owners : (pUsers as any[]);
-                        const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
-                        next[txId] = agentIds;
-                        changed = true;
-                    }
-                    if (changed) {
-                        try { localStorage.setItem('bt_tx_parts_v1', JSON.stringify(next)); } catch (e) { }
-                    }
-                    return next;
-                });
-            });
-        }
-    }, [paginatedTransactions, txParticipants]);
 
     const totalPages = Math.ceil(filteredTransactions.length / pageSize);
 
@@ -607,21 +582,21 @@ const TransactionsPage: React.FC = () => {
                                     </tr>
                                 ) : (
                                     paginatedTransactions.map(tx => {
-                                        // Try to find the agent name locally from our fetched agents
-                                        const participantIds = txParticipants[tx.id] || [];
-                                        let foundAgent = null;
-                                        for (const pid of participantIds) {
-                                            foundAgent = agents.find(a => a.id === pid || a.userId === pid);
-                                            if (foundAgent) break;
-                                        }
+                                        let agentName = tx.assigned_agent_name || '';
+                                        let agentAvatar = tx.assigned_agent_avatar || '';
 
-                                        // Fallback
-                                        if (!foundAgent) {
-                                            const fallbackId = tx.buying_side_representer?.id || tx.listing_side_representer?.id;
-                                            foundAgent = agents.find(a => a.id === fallbackId || a.userId === fallbackId);
+                                        if (!agentName) {
+                                            const owners = (tx as any).ownerFubIds || [];
+                                            for (const fubId of owners) {
+                                                const u = users.find(u => u.id === fubId);
+                                                if (u) {
+                                                    agentName = u.name;
+                                                    const fallbackPic = u.picture?.["162x162"] || u.picture?.["60x60"] || u.picture?.original;
+                                                    agentAvatar = fallbackPic || '';
+                                                    break;
+                                                }
+                                            }
                                         }
-
-                                        const agentName = foundAgent ? foundAgent.name : '';
 
                                         const isOppSeller = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && (tx.representing === 'seller' || tx.representing === 'both');
                                         const isOppBuyer = (tx.status === 'opportunity' || tx.status === 'pre_listing' || tx.status === 'pre-listing') && tx.representing === 'buyer';
@@ -644,9 +619,9 @@ const TransactionsPage: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        {foundAgent?.avatarUrl ? (
+                                                        {agentAvatar ? (
                                                             <img
-                                                                src={foundAgent.avatarUrl}
+                                                                src={agentAvatar}
                                                                 alt={agentName}
                                                                 className="w-8 h-8 rounded-full object-cover ring-2 ring-white/10 shrink-0"
                                                                 referrerPolicy="no-referrer"
@@ -655,7 +630,7 @@ const TransactionsPage: React.FC = () => {
                                                         ) : agentName ? (
                                                             <div className="w-8 h-8 shrink-0 rounded-full bg-slate-700 flex items-center justify-center ring-2 ring-white/10" title={agentName}>
                                                                 <span className="text-xs font-semibold text-slate-300">
-                                                                    {agentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                                    {agentName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
                                                                 </span>
                                                             </div>
                                                         ) : (

@@ -10,7 +10,7 @@ const getHeaders = () => {
 }
 
 export const fetchUsers = async (): Promise<FubUsersResponse> => {
-    const response = await fetch(`${BASE_URL}/users?limit=100`, {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=users`, {
         headers: getHeaders(),
     });
 
@@ -22,7 +22,7 @@ export const fetchUsers = async (): Promise<FubUsersResponse> => {
 };
 
 export const fetchPeople = async (limit = 100, offset = 0): Promise<FubPeopleResponse> => {
-    const response = await fetch(`${BASE_URL}/people?limit=${limit}&offset=${offset}`, {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=people&limit=${limit}&offset=${offset}`, {
         headers: getHeaders(),
     });
 
@@ -34,13 +34,13 @@ export const fetchPeople = async (limit = 100, offset = 0): Promise<FubPeopleRes
 };
 
 export const fetchAllPeople = async (): Promise<FubPeopleResponse> => {
-    // A more complete implementation might paginate through all results.
-    // For this dashboard, we'll fetch a larger sample to show recent activity.
-    return fetchPeople(500, 0); // FUB API max limit is typically 100 per page, but we will handle this in components if needed, or ask user. Let's start with 100
+    // We paginate people deeply via the Vercel proxy so we don't miss long-term reporting metrics
+    // Fetching 5000 leads gets us ~ 1 year back
+    return fetchPeople(5000, 0); 
 }
 
 export const searchPeople = async (nameQuery: string): Promise<FubPeopleResponse> => {
-    const response = await fetch(`${BASE_URL}/people?limit=10&name=${encodeURIComponent(nameQuery)}`, {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=people&limit=10&name=${encodeURIComponent(nameQuery)}`, {
         headers: getHeaders(),
     });
 
@@ -52,7 +52,7 @@ export const searchPeople = async (nameQuery: string): Promise<FubPeopleResponse
 };
 
 export const searchPeopleByEmail = async (email: string): Promise<FubPeopleResponse> => {
-    const response = await fetch(`${BASE_URL}/people?limit=10&email=${encodeURIComponent(email)}`, {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=people&limit=10&email=${encodeURIComponent(email)}`, {
         headers: getHeaders(),
     });
 
@@ -64,7 +64,7 @@ export const searchPeopleByEmail = async (email: string): Promise<FubPeopleRespo
 };
 
 export const fetchDeals = async (limit = 100, offset = 0): Promise<FubDealsResponse> => {
-    const response = await fetch(`${BASE_URL}/deals?limit=${limit}&offset=${offset}`, {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=deals&limit=${limit}&offset=${offset}`, {
         headers: getHeaders(),
     });
 
@@ -79,3 +79,26 @@ export const fetchAllDeals = async (): Promise<FubDealsResponse> => {
     // Server-side (api/deals.js) now paginates all FUB pages and returns the complete dataset.
     return fetchDeals(100, 0);
 }
+
+export const createEvent = async (eventData: any): Promise<any> => {
+    const response = await fetch(`${BASE_URL}/fub-proxy?action=events`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        body: JSON.stringify(eventData)
+    });
+
+    if (!response.ok) {
+        let msg = response.statusText;
+        try {
+            const err = await response.json();
+            if (err.details) msg = err.details;
+            if (err.errorMessage) msg = err.errorMessage;
+        } catch (e) { }
+        throw new Error(`Failed to create event: ${msg}`);
+    }
+
+    return response.json();
+};

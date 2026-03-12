@@ -82,7 +82,7 @@ const DealCard: React.FC<{ deal: UnifiedDeal; type: 'pending' | 'closed'; agentN
                         {deal.status === 'pending' ? 'under contract' : deal.status}
                     </span>
                 </div >
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-xs">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-2 text-xs">
                     <div className="flex flex-col gap-1">
                         <span className="text-slate-500 uppercase tracking-wide">Side</span>
                         <span className="text-slate-300 capitalize">{deal.representing || '—'}</span>
@@ -90,6 +90,12 @@ const DealCard: React.FC<{ deal: UnifiedDeal; type: 'pending' | 'closed'; agentN
                     <div className="flex flex-col gap-1">
                         <span className="text-slate-500 uppercase tracking-wide">Price</span>
                         <span className="text-slate-300 font-medium">{formatCurrency(deal.price)}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <span className="text-slate-500 uppercase tracking-wide">Source</span>
+                        <span className="text-slate-300 truncate" title={deal.custom_attributes?.find(a => a.name === 'lead_source' || a.label === 'Lead source' || a.label === 'Lead Source')?.value || '—'}>
+                            {deal.custom_attributes?.find(a => a.name === 'lead_source' || a.label === 'Lead source' || a.label === 'Lead Source')?.value || '—'}
+                        </span>
                     </div>
                     <div className="flex flex-col gap-1">
                         <span className="text-slate-500 uppercase tracking-wide">

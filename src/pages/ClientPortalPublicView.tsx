@@ -86,7 +86,7 @@ const ClientPortalPublicView: React.FC = () => {
                     transition={{ duration: 0.8, ease: "easeOut" }}
                     className="text-center mb-16 space-y-6"
                 >
-                    {typeof portal.agentPhotoUrl === 'string' && portal.agentPhotoUrl.startsWith('http') ? (
+                    {typeof portal.agentPhotoUrl === 'string' && portal.agentPhotoUrl.trim().length > 0 ? (
                         <div className="inline-flex items-center justify-center p-1 bg-brand-green/20 rounded-full mb-2 shadow-2xl shadow-brand-green/10 border-2 border-brand-green/30">
                             <img src={portal.agentPhotoUrl} alt="Your Agent" className="w-24 h-24 rounded-full object-cover border border-white/10" />
                         </div>

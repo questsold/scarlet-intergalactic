@@ -272,7 +272,7 @@ const ClientPortalsPage: React.FC = () => {
                                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
                                             <span className="text-slate-500 text-sm">Agent:</span>
                                             <div className="flex items-center gap-2">
-                                                {typeof portal.agentPhotoUrl === 'string' && portal.agentPhotoUrl.startsWith('http') ? (
+                                                {typeof portal.agentPhotoUrl === 'string' && portal.agentPhotoUrl.trim().length > 0 ? (
                                                     <img src={portal.agentPhotoUrl} alt="Agent" className="w-6 h-6 rounded-full object-cover border border-white/10" />
                                                 ) : (
                                                     <div className="w-6 h-6 rounded-full flex items-center justify-center bg-brand-green/20 text-brand-green border border-brand-green/30 text-[10px] font-bold cursor-default">

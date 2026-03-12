@@ -11,7 +11,7 @@
     ],
     "build": {},
     "functions": {
-        "api/deals.js": {
+        "api/fub-proxy.ts": {
             "maxDuration": 60
         }
     }

@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react';
 import DashboardLayout from './components/DashboardLayout';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from './services/firebase';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import AgentTable from './components/AgentTable';
 import TopProducers from './components/TopProducers';
 import { fetchAllPeople, fetchUsers, fetchAllDeals } from './services/fubApi';
@@ -29,7 +29,8 @@ function App() {
   const [users, setUsers] = useState<FubUser[]>([]);
   const [deals, setDeals] = useState<FubDeal[]>([]);
   const [transactions, setTransactions] = useState<BoldTrailTransaction[]>([]);
-  const [ownedTransactions, setOwnedTransactions] = useState<BoldTrailTransaction[] | null>(null);
+
+
   const [btUsers, setBtUsers] = useState<BoldTrailUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,7 @@ function App() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [directoryPhotos, setDirectoryPhotos] = useState<Record<string, string>>({});
-  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number }>>({});
+  const [agentCaps, setAgentCaps] = useState<Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number, volume?: number }>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,11 +72,10 @@ function App() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [peopleResponse, usersResponse, dealsResponse, btTransactionsRes, btUsersRes, dbUsersSnap] = await Promise.all([
+        const [peopleResponse, usersResponse, dealsResponse, btUsersRes, dbUsersSnap] = await Promise.all([
           fetchAllPeople(),
           fetchUsers(),
           fetchAllDeals(),
-          boldtrailApi.getTransactions(),
           boldtrailApi.getUsers(),
           getDocs(collection(db, 'allowed_users')).catch((err) => {
             console.warn("Insufficient permissions for allowed_users, bypassing dashboard avatars:", err);
@@ -88,7 +88,6 @@ function App() {
         setUsers(uRes);
         setBtUsers(buRes);
         setDeals(dealsResponse.deals || []);
-        setTransactions(btTransactionsRes || []);
 
         const photos: Record<string, string> = {};
         dbUsersSnap.forEach(d => {
@@ -99,17 +98,7 @@ function App() {
         });
         setDirectoryPhotos(photos);
 
-        const currentFubUser = authUser?.email ? uRes.find(u => u.email?.toLowerCase() === authUser.email!.toLowerCase()) : null;
-        let myTxs: BoldTrailTransaction[] | null = null;
 
-        if (currentFubUser && currentFubUser.role !== 'Owner') {
-          const btUser = buRes.find(bu => bu.email?.toLowerCase() === currentFubUser.email?.toLowerCase());
-          if (btUser) {
-            const btUserId = btUser.user_id || btUser.id;
-            myTxs = await boldtrailApi.getTransactions(1000, btUserId);
-          }
-        }
-        setOwnedTransactions(myTxs);
 
         setError(null);
       } catch (err: any) {
@@ -120,6 +109,24 @@ function App() {
       }
     };
     loadData();
+
+    // Set up real-time listener for Firestore transactions
+    const txColRef = collection(db, 'transactions');
+    const unsubscribeTx = onSnapshot(txColRef, (snapshot) => {
+      const allTx: any[] = [];
+      snapshot.forEach((doc) => {
+        allTx.push({ ...doc.data(), id: parseInt(doc.id, 10) });
+      });
+      // Sort them descending by created_at since BoldTrail API did that
+      allTx.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      setTransactions(allTx);
+    }, (error) => {
+      console.error("Error fetching transactions from Firestore", error);
+    });
+
+    return () => {
+      unsubscribeTx();
+    };
   }, []);
 
   const LOCAL_STORAGE_KEY_COMMS = 'bt_tx_comms_v1';
@@ -131,86 +138,7 @@ function App() {
     return {};
   });
 
-  const LOCAL_STORAGE_KEY = 'bt_tx_parts_v1';
-  const [txParticipants, setTxParticipants] = useState<Record<number, number[]>>(() => {
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (cached) return JSON.parse(cached);
-    } catch (e) { }
-    return {};
-  });
 
-  // Background hydration for missing transactions
-  useEffect(() => {
-    if (transactions.length === 0) return;
-
-    // Only hydrate recent deals (strictly THIS year) to avoid hitting Brokermint's 200 request/minute API rate limits
-    const now = new Date();
-    const currentYear = now.getFullYear();
-
-    const relevantTxs = transactions.filter(tx => {
-      const d1 = tx.closing_date ? new Date(tx.closing_date).getFullYear() : 0;
-      const d2 = tx.acceptance_date ? new Date(tx.acceptance_date).getFullYear() : 0;
-
-      // Strict mapping: Dashboard defaults to "This Year" (2026).
-      // Only fetch deals that actually impact the leaderboard or KPIs for "This Year".
-      const impactsThisYear = (d1 === currentYear || d2 === currentYear);
-      const isImportantStatus = ['closed', 'pending', 'listing'].includes(tx.status);
-
-      const hasBrokerageAccountOverride = tx.buying_side_representer?.id === 2750 || tx.listing_side_representer?.id === 2750;
-
-      return impactsThisYear && isImportantStatus && hasBrokerageAccountOverride;
-    });
-
-    const missingIds = relevantTxs.map(tx => tx.id).filter(id => !txParticipants[id]);
-    if (missingIds.length === 0) return;
-
-    let isMounted = true;
-    const fetchMissing = async () => {
-      // EXTREMELY conservative chunking. Vercel will fan-out these requests to Brokermint.
-      // Brokermint limits to 200req/min. We will send 10 at a time, every 3.5 seconds. (~170req/min theoretical max)
-      const chunkSize = 10;
-      for (let i = 0; i < missingIds.length; i += chunkSize) {
-        if (!isMounted) break;
-        const chunk = missingIds.slice(i, i + chunkSize);
-        try {
-          const res = await boldtrailApi.getTransactionParticipants(chunk);
-          if (!isMounted) break;
-
-          setTxParticipants(prev => {
-            const next = { ...prev };
-            let changed = false;
-            for (const [txIdStr, pUsers] of Object.entries(res)) {
-              if ((pUsers as any).error === 429) continue; // rate limited
-              const txId = parseInt(txIdStr);
-              const owners = (pUsers as any[]).filter(u => u && (u as any).owner === true);
-              const targets = owners.length > 0 ? owners : (pUsers as any[]);
-              const agentIds = targets.map(u => u.user_id || u.account_user_id || u.id).filter(Boolean);
-              next[txId] = agentIds;
-              changed = true;
-            }
-            if (changed) {
-              try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next)); } catch (e) { }
-            }
-            return next;
-          });
-        } catch (e) {
-          console.error("Participant fetch error", e);
-        }
-
-        // 3.5 second delay between batches to respect Brokermint's API rate limits
-        await new Promise(resolve => setTimeout(resolve, 3500));
-      }
-    };
-
-    // Delay the start of background fetch by 10 seconds to allow core API requests (transactions, users) to finish untouched.
-    const timeoutId = setTimeout(fetchMissing, 10000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [transactions]);
 
   // Background hydration for missing commissions
   useEffect(() => {
@@ -295,7 +223,7 @@ function App() {
       const btIdToEmail = new Map<number, string>();
       btUsers.forEach(bu => { if (bu.email) btIdToEmail.set(bu.id, bu.email.toLowerCase()); });
 
-      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number }> = {};
+      const finalCaps: Record<number, { capAmount: number, officeContribution: number, anniversaryTs: number, agentNet: number, volume?: number }> = {};
 
       for (const [btIdStr, profile] of Object.entries(btProfiles)) {
         if (!profile) continue;
@@ -310,6 +238,7 @@ function App() {
         let anniversaryTs = 0;
         let officeContribution = 0;
         let agentNet = 0;
+        let volume = 0;
 
         let reportRow = null;
         if (reportData && reportData.length > 0) {
@@ -320,6 +249,7 @@ function App() {
           anniversaryTs = reportRow.anniversary_date || 0;
           officeContribution = Number(reportRow.office_contribution) || 0;
           agentNet = Number(reportRow.agent_net) || 0;
+          volume = Number(reportRow.prorated_sales_volume) || 0;
         } else {
           // Fallback if not in report
           if (profile.anniversary_date) {
@@ -337,7 +267,8 @@ function App() {
           capAmount,
           officeContribution,
           anniversaryTs,
-          agentNet
+          agentNet,
+          volume
         };
       }
 
@@ -400,9 +331,10 @@ function App() {
   // --- Production Table Data Processing ---
   // IMPORTANT: Closed and pending deals are counted by when the deal *entered that stage* (enteredStageAt),
   // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
+  // NOT by when the deal was created (createdAt). This is the correct behavior: a deal created in October
   // but closed in February should count toward February's closed total.
-  const { filteredTransactions, productionTableData, dashboardKpis } = useMemo(() => {
-    if (users.length === 0 || isAdmin === null) return { productionTableData: [], filteredTransactions: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], cancelledTotalYTD: [], closed: [], closedTotalYTD: [] } };
+  const { filteredTransactions, productionTableData, zillowProductionData, dashboardKpis } = useMemo(() => {
+    if (users.length === 0 || isAdmin === null) return { productionTableData: [], zillowProductionData: [], filteredTransactions: [], dashboardKpis: { activeListings: [], activeListingsTotal: [], underContract: [], underContractTotal: [], cancelled: [], cancelledTotalYTD: [], closed: [], closedTotalYTD: [] } };
 
     // Determine if we should filter the global dashboard down to just the currently logged-in Agent
     let authFubUserId: number | null = null;
@@ -464,11 +396,14 @@ function App() {
     };
 
     const prodMap = new Map<number, AgentProductionData>();
+    const zillowMap = new Map<number, AgentProductionData>();
+
     users.forEach(user => {
       if (user.status === 'Active' && (user.role === 'Owner' || user.role === 'Agent')) {
         const emailLower = user.email?.toLowerCase();
         const fallbackPic = user.picture?.["162x162"] || user.picture?.["60x60"] || user.picture?.original;
         const caps = agentCaps[user.id];
+        
         prodMap.set(user.id, {
           agentName: user.name,
           newLeads: 0,
@@ -480,6 +415,21 @@ function App() {
           officeContribution: caps?.officeContribution,
           fubUserId: user.id
         });
+
+        zillowMap.set(user.id, {
+          agentName: user.name,
+          newLeads: 0,
+          writtenDeals: 0,
+          closedDeals: 0,
+          volume: 0,
+          avatarUrl: (emailLower && directoryPhotos[emailLower]) || fallbackPic,
+          fubUserId: user.id,
+          zillowApptMet: 0,
+          zillowShowingHomes: 0,
+          zillowSubmittingOffers: 0,
+          zillowUnderContract: 0,
+          zillowClosed: 0
+        });
       }
     });
 
@@ -488,6 +438,21 @@ function App() {
       const agentId = person.assignedUserId;
       if (agentId && prodMap.has(agentId)) {
         prodMap.get(agentId)!.newLeads += 1;
+      }
+
+      if (agentId && zillowMap.has(agentId)) {
+        const isZillow = person.source?.toLowerCase().includes('zillow prefer');
+        if (isZillow) {
+          const zProd = zillowMap.get(agentId)!;
+          zProd.newLeads += 1;
+
+          const stageLower = person.stage?.toLowerCase();
+          if (stageLower === 'met with customer') zProd.zillowApptMet! += 1;
+          else if (stageLower === 'showing homes') zProd.zillowShowingHomes! += 1;
+          else if (stageLower === 'submitting offers') zProd.zillowSubmittingOffers! += 1;
+          else if (stageLower === 'under contract') zProd.zillowUnderContract! += 1;
+          else if (stageLower === 'closed') zProd.zillowClosed! += 1;
+        }
       }
     });
 
@@ -520,27 +485,18 @@ function App() {
     });
 
 
-    const transactionsToIterateForKPIs = (ownedTransactions !== null && authFubUserId) ? ownedTransactions : transactions;
+    const transactionsToIterateForKPIs = transactions;
 
     transactionsToIterateForKPIs.forEach(tx => {
       // Is this deal belonging to the logged in agent?
       let belongsToAgent = false;
       if (!authFubUserId) {
         belongsToAgent = true; // Admin sees all
-      } else if (ownedTransactions !== null) {
-        belongsToAgent = true; // Entire list belongs to the agent
       } else {
-        let _btAgentIds = txParticipants[tx.id];
-        if (!_btAgentIds || _btAgentIds.length === 0) {
-          _btAgentIds = [];
-          if (tx.buying_side_representer?.id) _btAgentIds.push(tx.buying_side_representer.id);
-          if (tx.listing_side_representer?.id) _btAgentIds.push(tx.listing_side_representer.id);
-        }
-        for (const btAgentId of _btAgentIds) {
-          const agentEmail = btIdToEmailMap.get(btAgentId);
-          const agentName = btIdToNameMap.get(btAgentId);
-          if (agentEmail && emailToFubUserId.get(agentEmail) === authFubUserId) { belongsToAgent = true; break; }
-          if (agentName && nameToFubUserId.get(agentName.toLowerCase()) === authFubUserId) { belongsToAgent = true; break; }
+        // Read directly from the firestore enriched array `ownerFubIds`
+        const owners = (tx as any).ownerFubIds || [];
+        if (owners.includes(authFubUserId)) {
+          belongsToAgent = true;
         }
       }
 
@@ -612,68 +568,53 @@ function App() {
       const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
 
       // Map agent production
-      let btAgentIds = txParticipants[tx.id];
-      if (!btAgentIds || btAgentIds.length === 0) {
-        btAgentIds = [];
-        if (tx.buying_side_representer?.id) btAgentIds.push(tx.buying_side_representer.id);
-        if (tx.listing_side_representer?.id) btAgentIds.push(tx.listing_side_representer.id);
-      }
+      const owners = (tx as any).ownerFubIds || [];
+      const uniqueFubIds = Array.from(new Set(owners)) as number[];
 
-      const uniqueBtAgentIds = Array.from(new Set(btAgentIds));
-
-      for (const btAgentId of uniqueBtAgentIds) {
-        const agentName = btIdToNameMap.get(btAgentId);
-        const agentEmail = btIdToEmailMap.get(btAgentId);
-
-        if (agentName || agentEmail) {
-          let fubId: number | undefined;
-          if (agentEmail && emailToFubUserId.has(agentEmail)) {
-            fubId = emailToFubUserId.get(agentEmail);
-          } else if (agentName && nameToFubUserId.has(agentName.toLowerCase())) {
-            fubId = nameToFubUserId.get(agentName.toLowerCase());
+      for (const fubId of uniqueFubIds) {
+        const fubUser = users.find(u => u.id === fubId);
+        if (fubUser) {
+          const isOwner = fubUser.role === 'Owner';
+          if (!tx.assigned_agent_name || ((tx as any)._temp_assigned_is_owner && !isOwner)) {
+            const fallbackPic = fubUser.picture?.["162x162"] || fubUser.picture?.["60x60"] || fubUser.picture?.original;
+            (tx as any).assigned_agent_name = fubUser.name;
+            (tx as any).assigned_agent_avatar = (fubUser.email?.toLowerCase() && directoryPhotos[fubUser.email.toLowerCase()]) || fallbackPic;
+            if (isOwner) (tx as any)._temp_assigned_is_owner = true;
           }
+        }
 
-          if (fubId) {
-            const fubUser = users.find(u => u.id === fubId);
-            if (fubUser) {
-              const isOwner = fubUser.role === 'Owner';
-              if (!tx.assigned_agent_name || ((tx as any)._temp_assigned_is_owner && !isOwner)) {
-                const emailLower = fubUser.email?.toLowerCase();
-                const fallbackPic = fubUser.picture?.["162x162"] || fubUser.picture?.["60x60"] || fubUser.picture?.original;
-                tx.assigned_agent_name = agentName;
-                tx.assigned_agent_avatar = (emailLower && directoryPhotos[emailLower]) || fallbackPic;
-                (tx as any)._temp_assigned_is_owner = isOwner;
-              }
-            }
-          }
-
-          if (fubId && prodMap.has(fubId)) {
-            const prod = prodMap.get(fubId)!;
-            if (isWritten && isValidWrittenStatus) prod.writtenDeals += 1;
-            if (isClosed) {
-              const comms = txCommissions[tx.id];
-              prod.closedDeals += 1;
-              prod.volume += (tx.price || 0) / btAgentIds.length;
-              prod.officeContributionTimeframe = (prod.officeContributionTimeframe || 0) + (comms ? comms.officeNet / btAgentIds.length : 0);
-            }
+        if (fubId && prodMap.has(fubId)) {
+          const prod = prodMap.get(fubId)!;
+          if (isWritten && isValidWrittenStatus) prod.writtenDeals += 1;
+          if (isClosed) {
+            const comms = txCommissions[tx.id];
+            prod.closedDeals += 1;
+            prod.volume += (tx.price || 0) / uniqueFubIds.length;
+            prod.officeContributionTimeframe = (prod.officeContributionTimeframe || 0) + (comms ? comms.officeNet / uniqueFubIds.length : 0);
           }
         }
       }
     });
 
-    // Enforce exact match for "This Year" timeframe to align calendar YTD strictly with Cap YTD visually per business requirement
-    if (timeframe === 'This Year') {
-      for (const prod of prodMap.values()) {
-        prod.officeContributionTimeframe = prod.officeContribution || 0;
+    // Enforce definitive Cap Report metrics for strictly accurate Volume & Office Contribution rendering
+    for (const [fubId, prod] of prodMap.entries()) {
+      const caps = agentCaps[fubId];
+      if (caps) {
+        prod.volume = caps.volume || 0;
+        prod.officeContribution = caps.officeContribution || 0;
+      } else {
+        prod.volume = 0;
+        prod.officeContribution = 0;
       }
     }
 
     return {
       filteredTransactions,
       productionTableData: Array.from(prodMap.values()),
+      zillowProductionData: Array.from(zillowMap.values()),
       dashboardKpis: { activeListings, activeListingsTotal, underContract, underContractTotal, cancelled, cancelledTotalYTD, closed, closedTotalYTD }
     };
-  }, [filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txParticipants, txCommissions, authUser, isAdmin, directoryPhotos, agentCaps]);
+  }, [people, filteredPeople, deals, transactions, btUsers, users, timeframe, customStartDate, customEndDate, txCommissions, authUser, isAdmin, directoryPhotos, agentCaps]);
 
   // Format data for the TopProducers component
   const topProducersData = useMemo(() => {
@@ -713,11 +654,13 @@ function App() {
     // 2. BoldTrail Active Listings
     transactions.forEach(tx => {
       if (tx.status === 'listing' && (tx.representing === 'seller' || tx.representing === 'both')) {
-        const btAgentIds = txParticipants[tx.id] || [];
-        for (const btAgentId of btAgentIds) {
-          const agentName = btIdToNameMap.get(btAgentId);
-          if (agentName && map.has(agentName)) {
-            map.get(agentName)!.push(tx);
+        const owners = (tx as any).ownerFubIds || [];
+        for (const fubId of owners) {
+          const fubUser = users.find(u => u.id === fubId);
+          if (fubUser && fubUser.name) {
+            if (map.has(fubUser.name)) {
+              map.get(fubUser.name)!.push(tx);
+            }
           }
         }
       }
@@ -726,17 +669,19 @@ function App() {
     // 3. BoldTrail Transactions (Pending, Closed, Cancelled)
     transactions.forEach(tx => {
       if (tx.status === 'listing') return; // Handled above for Active Listings
-      const btAgentIds = txParticipants[tx.id] || [];
-      for (const btAgentId of btAgentIds) {
-        const agentName = btIdToNameMap.get(btAgentId);
-        if (agentName && map.has(agentName)) {
-          map.get(agentName)!.push(tx);
+      const owners = (tx as any).ownerFubIds || [];
+      for (const fubId of owners) {
+        const fubUser = users.find(u => u.id === fubId);
+        if (fubUser && fubUser.name) {
+          if (map.has(fubUser.name)) {
+            map.get(fubUser.name)!.push(tx);
+          }
         }
       }
     });
 
     return map;
-  }, [deals, transactions, btUsers, users, txParticipants]);
+  }, [deals, transactions, btUsers, users]);
 
 
   const handleAgentClick = (agentName: string) => {
@@ -971,6 +916,10 @@ function App() {
           data={isAdmin ? productionTableData : (() => {
             const currentFubUser = users.find(u => u.email?.toLowerCase() === authUser?.email?.toLowerCase());
             return currentFubUser ? productionTableData.filter(d => d.fubUserId === currentFubUser.id) : [];
+          })()}
+          zillowData={isAdmin ? zillowProductionData : (() => {
+            const currentFubUser = users.find(u => u.email?.toLowerCase() === authUser?.email?.toLowerCase());
+            return currentFubUser ? zillowProductionData.filter(d => d.fubUserId === currentFubUser.id) : [];
           })()}
           onAgentClick={handleAgentClick}
         />
