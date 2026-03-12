@@ -396,6 +396,14 @@ function App() {
           rangeStart = new Date(2025, 0, 1); rangeEnd = new Date(2026, 0, 1); break;
         case '2024':
           rangeStart = new Date(2024, 0, 1); rangeEnd = new Date(2025, 0, 1); break;
+        case 'ZHL 3 Month':
+          rangeStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+          rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          break;
+        case 'ZHL 6 Month':
+          rangeStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          break;
         case 'Custom':
           if (customStartDate) rangeStart = new Date(customStartDate);
           if (customEndDate) { const e = new Date(customEndDate); e.setDate(e.getDate() + 1); rangeEnd = e; }

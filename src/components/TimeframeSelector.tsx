@@ -57,7 +57,7 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
 
                 {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-[#1c2336] border border-white/10 overflow-hidden z-50">
-                        {(['This Week', 'This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'Last 90 days', 'Last 180 days', 'This Quarter', 'This Year', '2025', '2024', 'All Time', 'Custom'] as Timeframe[]).map((tf) => (
+                        {(['This Week', 'This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'Last 90 days', 'Last 180 days', 'This Quarter', 'This Year', '2025', '2024', 'All Time', 'ZHL 3 Month', 'ZHL 6 Month', 'Custom'] as Timeframe[]).map((tf) => (
                             <button
                                 key={tf}
                                 onClick={() => {

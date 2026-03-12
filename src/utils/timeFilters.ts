@@ -1,4 +1,4 @@
-export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'Last 3 Months' | 'Last 6 Months' | 'Last 90 days' | 'Last 180 days' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'Custom';
+export type Timeframe = 'This Week' | 'This Month' | 'Last Month' | 'Last 3 Months' | 'Last 6 Months' | 'Last 90 days' | 'Last 180 days' | 'This Quarter' | 'This Year' | '2025' | '2024' | 'All Time' | 'ZHL 3 Month' | 'ZHL 6 Month' | 'Custom';
 
 export const filterByTimeframe = <T extends { created?: string, createdAt?: string, created_at?: number }>(
     data: T[],
@@ -66,6 +66,14 @@ export const filterByTimeframe = <T extends { created?: string, createdAt?: stri
         case '2024':
             startDate = new Date(2024, 0, 1);
             endDate = new Date(2025, 0, 1);
+            break;
+        case 'ZHL 3 Month':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            break;
+        case 'ZHL 6 Month':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             break;
         case 'Custom':
             if (customStartDate) startDate = new Date(customStartDate);
