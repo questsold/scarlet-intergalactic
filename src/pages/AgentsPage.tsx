@@ -16,12 +16,20 @@ interface FubAgent {
     picture?: any;
 }
 
+interface BtCapReport {
+    prorated_sales_volume?: number;
+    agent_net?: number;
+    office_contribution?: number;
+    anniversary_date?: number;
+}
+
 interface UserAccess {
     email: string;
     hasAccess: boolean;
     role: 'admin' | 'user';
     photoUrl?: string;
     btProfile?: BtProfile;
+    btCapReport?: BtCapReport;
 }
 
 interface BtProfile {
@@ -63,8 +71,6 @@ const AgentsPage: React.FC = () => {
     const [btProfiles, setBtProfiles] = useState<Record<string, BtProfile>>({});
     const [saving, setSaving] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [emailToBtIdMap, setEmailToBtIdMap] = useState<Record<string, number>>({});
-    const [capReportData, setCapReportData] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -99,20 +105,6 @@ const AgentsPage: React.FC = () => {
                 setAccessMap(map);
                 setBtProfiles(loadedBtProfiles);
 
-                // 3. Fetch BoldTrail Users to match emails to BT IDs
-                const btUsers = await boldtrailApi.getUsers();
-                const emailToBtId: Record<string, number> = {};
-                btUsers.forEach(u => {
-                    if (u.email) {
-                        emailToBtId[u.email.toLowerCase()] = u.id;
-                    }
-                });
-                setEmailToBtIdMap(emailToBtId);
-
-                // 4. Fetch Cap Report
-                const capReport = await boldtrailApi.getCapReport();
-                setCapReportData(capReport);
-
             } catch (err) {
                 console.error("Error loading settings data:", err);
             } finally {
@@ -125,6 +117,29 @@ const AgentsPage: React.FC = () => {
     const syncAgentData = async () => {
         setIsSyncing(true);
         try {
+            // Fetch users to map emails to BT IDs
+            const btUsers = await boldtrailApi.getUsers();
+            const emailToBtIdMap: Record<string, number> = {};
+            btUsers.forEach(u => {
+                if (u.email) {
+                    emailToBtIdMap[u.email.toLowerCase()] = u.id;
+                }
+            });
+
+            // Fetch cap report
+            const capReport = await boldtrailApi.getCapReport();
+            const capReportByEmail: Record<string, BtCapReport> = {};
+            capReport.forEach((row: any) => {
+                 if (row.email) {
+                     capReportByEmail[row.email.toLowerCase()] = {
+                          prorated_sales_volume: row.prorated_sales_volume,
+                          agent_net: row.agent_net,
+                          office_contribution: row.office_contribution,
+                          anniversary_date: row.anniversary_date
+                     };
+                 }
+            });
+
             const btIdsToFetch: number[] = [];
             const agentEmails = fubAgents.map(a => a.email?.toLowerCase()).filter(Boolean) as string[];
 
@@ -150,20 +165,30 @@ const AgentsPage: React.FC = () => {
                         };
                     }
                 });
-                setBtProfiles(profileMapByEmail);
+                setBtProfiles(prev => ({ ...prev, ...profileMapByEmail }));
             }
 
-            // Sync agent photos from FUB to Firestore allowed_users directory immediately
-            const agentUpdates = fubAgents.filter(a => a.email && a.picture).map(async (agent) => {
+            // Sync agent photos, profiles, and cap stats to Firestore immediately
+            const agentUpdates = fubAgents.filter(a => a.email).map(async (agent) => {
                 const emailKey = agent.email!.toLowerCase();
                 const avatar = agent.picture?.["162x162"] || agent.picture?.["60x60"] || agent.picture?.original;
-                if (avatar || profileMapByEmail[emailKey]) {
+                const hasUpdates = avatar || profileMapByEmail[emailKey] || capReportByEmail[emailKey];
+                
+                if (hasUpdates) {
                     const docRef = doc(db, 'allowed_users', emailKey);
 
                     setAccessMap(prev => {
                         const existing = prev[emailKey];
                         if (!existing) return prev;
-                        return { ...prev, [emailKey]: { ...existing, photoUrl: avatar || existing.photoUrl, btProfile: profileMapByEmail[emailKey] || existing.btProfile } };
+                        return { 
+                            ...prev, 
+                            [emailKey]: { 
+                                ...existing, 
+                                photoUrl: avatar || existing.photoUrl, 
+                                btProfile: profileMapByEmail[emailKey] || existing.btProfile, 
+                                btCapReport: capReportByEmail[emailKey] || existing.btCapReport 
+                            } 
+                        };
                     });
 
                     const updatePayload: any = {
@@ -172,6 +197,7 @@ const AgentsPage: React.FC = () => {
                     };
                     if (avatar) updatePayload.photoUrl = avatar;
                     if (profileMapByEmail[emailKey]) updatePayload.btProfile = profileMapByEmail[emailKey];
+                    if (capReportByEmail[emailKey]) updatePayload.btCapReport = capReportByEmail[emailKey];
 
                     await setDoc(docRef, updatePayload, { merge: true }).catch(err => {
                         console.warn(`Could not sync data to firestore for ${emailKey}:`, err);
@@ -368,7 +394,7 @@ const AgentsPage: React.FC = () => {
                                                 const dbAccess = emailKey ? accessMap[emailKey] : null;
                                                 const hasAccess = dbAccess?.hasAccess || false;
                                                 const isSaving = saving === emailKey;
-                                                const capRow = emailKey ? capReportData.find(r => r.email?.toLowerCase() === emailKey) : null;
+                                                const capRow = dbAccess?.btCapReport || null;
 
                                                 return (
                                                     <tr key={agent.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
