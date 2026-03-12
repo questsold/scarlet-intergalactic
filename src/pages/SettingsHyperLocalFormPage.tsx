@@ -6,24 +6,10 @@ import { fetchUsers, createEvent } from '../services/fubApi';
 import type { FubUser } from '../types/fub';
 
 const LEADS_SOURCES = [
-    "Amerisave Realty",
-    "DFCU",
-    "Facebook",
-    "Google",
-    "MyLinked Solutions",
-    "Open House",
-    "Other/Agent",
-    "ProBroker",
-    "Referral",
-    "Return Client",
-    "Rocket HyperLocal",
-    "Sphere",
-    "Website",
-    "Yelp",
-    "Zillow"
+    "Rocket HyperLocal"
 ];
 
-const SettingsNewLeadFormPage: React.FC = () => {
+const SettingsHyperLocalFormPage: React.FC = () => {
     const navigate = useNavigate();
     const [loadingSettings, setLoadingSettings] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -37,7 +23,7 @@ const SettingsNewLeadFormPage: React.FC = () => {
         lastName: '',
         email: '',
         phone: '',
-        source: '',
+        source: 'Rocket HyperLocal',
         assignedUserId: '',
         tag1: '',
         tag2: ''
@@ -117,7 +103,7 @@ const SettingsNewLeadFormPage: React.FC = () => {
                 lastName: '',
                 email: '',
                 phone: '',
-                source: '',
+                source: 'Rocket HyperLocal',
                 assignedUserId: '',
                 tag1: '',
                 tag2: ''
@@ -154,12 +140,12 @@ const SettingsNewLeadFormPage: React.FC = () => {
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-100">New Lead Input Form</h1>
-                        <p className="text-slate-400 mt-2">Enter lead details to automatically route them into Follow Up Boss.</p>
+                        <h1 className="text-3xl font-bold text-slate-100">Rocket HyperLocal Lead Form</h1>
+                        <p className="text-slate-400 mt-2">Enter lead details specifically for Rocket HyperLocal inbound leads.</p>
                     </div>
                 </div>
 
-                <div className="glass-card bg-[#1c2336] border border-white/5 rounded-2xl p-6 md:p-8">
+                <div className="glass-card bg-[#1c2336] border border-white/5 border-t-purple-500/50 rounded-2xl p-6 md:p-8">
                     {isSuccess && (
                         <div className="mb-6 p-4 rounded-xl bg-brand-green/10 border border-brand-green/20 flex items-start gap-4">
                             <CheckCircle className="text-brand-green shrink-0 mt-0.5" size={20} />
@@ -340,4 +326,4 @@ const SettingsNewLeadFormPage: React.FC = () => {
 
 };
 
-export default SettingsNewLeadFormPage;
+export default SettingsHyperLocalFormPage;

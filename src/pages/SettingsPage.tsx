@@ -40,12 +40,12 @@ const SettingsPage: React.FC = () => {
             path: "/agents"
         },
         ...(isAdmin ? [{
-            title: "New Lead Input Form",
-            description: "Manually input a lead and automatically route it to Follow Up Boss.",
+            title: "Lead Input Forms",
+            description: "Access options to manually input leads into your Follow Up Boss CRM.",
             icon: UserPlus,
             color: "text-brand-green",
             bg: "bg-brand-green/10",
-            path: "/settings/new-lead-form"
+            path: "/settings/lead-forms"
         }] : []),
         {
             title: "Notification Preferences",
