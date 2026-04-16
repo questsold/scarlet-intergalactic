@@ -100,8 +100,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 2. Fetch all transactions from BoldTrail
         const allTransactions: any[] = [];
         let startingFromId: number | undefined = undefined;
-        const limit = 10000;
-        const batchSize = 1000;
+        const limit = 20;
+        const batchSize = 20;
 
         while (allTransactions.length < limit) {
             let url = `${BROKERMINT_BASE_URL}/transactions?api_key=${BROKERMINT_API_KEY}&count=${batchSize}&sort_by=created_at&sort_order=desc${updatedSinceParam}`;
