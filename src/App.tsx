@@ -544,7 +544,7 @@ function App() {
       const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
       const isValidWrittenStatus = allowedWrittenStatuses.includes(tx.status);
 
-      const closeDateStr = tx.closing_date;
+      const closeDateStr = tx.closing_date || tx.closed_at;
       const isClosedState = tx.status === 'closed';
       const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
 
@@ -587,7 +587,7 @@ function App() {
       const allowedWrittenStatuses = ['pending', 'closed', 'cancelled'];
       const isValidWrittenStatus = allowedWrittenStatuses.includes(tx.status);
 
-      const closeDateStr = tx.closing_date;
+      const closeDateStr = tx.closing_date || tx.closed_at;
       const isClosedState = tx.status === 'closed';
       const isClosed = isClosedState && (timeframe === 'All Time' || inRange(closeDateStr));
 

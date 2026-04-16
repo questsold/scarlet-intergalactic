@@ -112,7 +112,7 @@ const DealCard: React.FC<{ deal: UnifiedDeal }> = ({ deal }) => {
                     <div className="flex flex-col gap-1">
                         <span className="text-slate-500 uppercase tracking-wide">Closing Date</span>
                         <span className="text-slate-300">
-                            {formatDate(deal.closing_date)}
+                            {formatDate(deal.closing_date || deal.closed_at)}
                         </span>
                     </div>
                 </div>
@@ -286,7 +286,7 @@ export const KpiDealsPage: React.FC = () => {
                 }
             } else if (title === 'Closed Deals') {
                 const isClosedState = tx.status === 'closed';
-                if (isClosedState && (timeframe === 'All Time' || inRange(tx.closing_date))) {
+                if (isClosedState && (timeframe === 'All Time' || inRange(tx.closing_date || tx.closed_at))) {
                     result.push(tx);
                 }
             }
